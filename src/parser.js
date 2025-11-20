@@ -164,8 +164,7 @@ function stringify(obj) {
       stringValue.includes('"') ||
       stringValue.includes('\\') ||
       stringValue.includes('#') ||
-      stringValue.startsWith(' ') ||
-      stringValue.endsWith(' ');
+      stringValue.includes(' ');
 
     if (needsQuotes) {
       // Escape special characters and wrap in double quotes
