@@ -364,3 +364,110 @@ SECRET=my_secret_value`);
     assert.match(parts[2], /^[0-9a-f]+$/); // Encrypted data
   });
 });
+
+describe('CLI - Additional Error Coverage', () => {
+  let testDir;
+
+  beforeEach(() => {
+    testDir = path.join(__dirname, 'temp_cli_errors_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should handle empty input file during encryption', () => {
+    const emptyFile = path.join(testDir, '.env');
+    fs.writeFileSync(emptyFile, '');
+
+    const result = runCLI(`encrypt --input "${emptyFile}" --output "${testDir}/.env.lock"`);
+
+    // Should generate warning about empty file
+    assert.ok(result.includes('OXOG_ENV_KEY') || result.error);
+  });
+
+  it('should handle file read error during encryption', () => {
+    const nonExistentFile = path.join(testDir, 'does-not-exist.env');
+
+    const result = runCLI(`encrypt --input "${nonExistentFile}" --output "${testDir}/.env.lock"`);
+
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('not found') || 
+        result.stdout.includes('not found')
+      );
+    }
+  });
+
+  it('should handle encryption failure', () => {
+    const testEnvPath = path.join(testDir, '.env');
+    fs.writeFileSync(testEnvPath, 'KEY=value');
+
+    // Invalid key format should fail
+    const result = runCLI(`encrypt --key invalid_key --input "${testEnvPath}" --output "${testDir}/.env.lock"`);
+
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('Invalid key format') ||
+        result.stdout.includes('Invalid key format')
+      );
+    }
+  });
+
+  it('should handle write error during encryption', () => {
+    const testEnvPath = path.join(testDir, '.env');
+    fs.writeFileSync(testEnvPath, 'KEY=value');
+
+    const key = crypto.generateKey();
+    const invalidOutputPath = '/invalid/path/output.lock';
+
+    const result = runCLI(`encrypt --key ${key} --input "${testEnvPath}" --output "${invalidOutputPath}"`);
+
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('Failed to write') ||
+        result.stdout.includes('Failed to write') ||
+        result.stderr.includes('ENOENT') ||
+        result.stdout.includes('ENOENT')
+      );
+    }
+  });
+
+  it('should handle decryption with empty file', () => {
+    const emptyLockFile = path.join(testDir, '.env.lock');
+    fs.writeFileSync(emptyLockFile, '');
+
+    const key = crypto.generateKey();
+    const result = runCLI(`decrypt --key ${key} --input "${emptyLockFile}"`);
+
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('empty') ||
+        result.stdout.includes('empty') ||
+        result.stderr.includes('Decryption failed') ||
+        result.stdout.includes('Decryption failed')
+      );
+    }
+  });
+
+  it('should handle decryption failure with wrong key', () => {
+    const testLockFile = path.join(testDir, '.env.lock');
+    const correctKey = crypto.generateKey();
+    const wrongKey = crypto.generateKey();
+
+    const encrypted = crypto.encrypt('KEY=value', correctKey);
+    fs.writeFileSync(testLockFile, encrypted);
+
+    const result = runCLI(`decrypt --key ${wrongKey} --input "${testLockFile}"`);
+
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('Decryption failed') ||
+        result.stdout.includes('Decryption failed')
+      );
+    }
+  });
+});

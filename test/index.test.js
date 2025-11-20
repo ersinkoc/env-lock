@@ -536,3 +536,212 @@ describe('index.js - Exported Parser Functions', () => {
     assert.ok(stringified.includes('KEY2=value2'));
   });
 });
+
+describe('index.js - Console Output Coverage', () => {
+  let envLock;
+  let originalEnv;
+  let originalWarn;
+  let originalError;
+  let originalLog;
+  let testDir;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+    originalEnv = { ...process.env };
+    originalWarn = console.warn;
+    originalError = console.error;
+    originalLog = console.log;
+
+    testDir = path.join(__dirname, 'temp_console_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    console.warn = originalWarn;
+    console.error = originalError;
+    console.log = originalLog;
+
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should log warning when OXOG_ENV_KEY is missing (silent=false)', () => {
+    delete process.env.OXOG_ENV_KEY;
+    let logged = false;
+
+    console.warn = (msg) => {
+      if (msg.includes('OXOG_ENV_KEY') && msg.includes('not set')) {
+        logged = true;
+      }
+    };
+
+    envLock.config({ silent: false });
+    assert.strictEqual(logged, true);
+  });
+
+  it('should log warning when .env.lock file not found (silent=false)', () => {
+    process.env.OXOG_ENV_KEY = crypto.generateKey();
+    const nonExistentPath = path.join(testDir, 'nonexistent.lock');
+    let logged = false;
+
+    console.warn = (msg) => {
+      if (msg.includes('not found')) {
+        logged = true;
+      }
+    };
+
+    envLock.config({
+      path: nonExistentPath,
+      silent: false
+    });
+
+    assert.strictEqual(logged, true);
+  });
+
+  it('should log warning when .env.lock is empty (silent=false)', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const emptyFilePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(emptyFilePath, '');
+
+    let logged = false;
+    console.warn = (msg) => {
+      if (msg.includes('empty')) {
+        logged = true;
+      }
+    };
+
+    envLock.config({
+      path: emptyFilePath,
+      silent: false
+    });
+
+    assert.strictEqual(logged, true);
+  });
+
+  it('should log error when decryption fails (silent=false)', () => {
+    const correctKey = crypto.generateKey();
+    const wrongKey = crypto.generateKey();
+
+    const testData = 'TEST_VAR=value';
+    const encrypted = crypto.encrypt(testData, correctKey);
+
+    const testFilePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testFilePath, encrypted);
+
+    process.env.OXOG_ENV_KEY = wrongKey;
+
+    let errorLogged = false;
+    console.error = (msg) => {
+      if (msg.includes('Failed to decrypt') || msg.includes('Details:')) {
+        errorLogged = true;
+      }
+    };
+
+    envLock.config({
+      path: testFilePath,
+      silent: false
+    });
+
+    assert.strictEqual(errorLogged, true);
+  });
+
+  it('should log success message when loading variables (silent=false)', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const testData = 'TEST_VAR1=value1\nTEST_VAR2=value2';
+    const encrypted = crypto.encrypt(testData, key);
+
+    const testFilePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testFilePath, encrypted);
+
+    let successLogged = false;
+    console.log = (msg) => {
+      if (msg.includes('Successfully loaded') && msg.includes('environment variable')) {
+        successLogged = true;
+      }
+    };
+
+    envLock.config({
+      path: testFilePath,
+      silent: false
+    });
+
+    assert.strictEqual(successLogged, true);
+  });
+});
+
+describe('index.js - File System Error Coverage', () => {
+  let envLock;
+  let originalEnv;
+  let originalError;
+  let testDir;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+    originalEnv = { ...process.env };
+    originalError = console.error;
+
+    testDir = path.join(__dirname, 'temp_fs_error_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    console.error = originalError;
+
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should handle file system errors during read (silent=false)', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    // Create a directory instead of a file to cause read error
+    const dirPath = path.join(testDir, '.env.lock');
+    fs.mkdirSync(dirPath);
+
+    let errorLogged = false;
+    console.error = (msg) => {
+      if (msg.includes('Error:')) {
+        errorLogged = true;
+      }
+    };
+
+    const result = envLock.config({
+      path: dirPath,
+      silent: false
+    });
+
+    // Should return empty object on error
+    assert.deepStrictEqual(result, {});
+    assert.strictEqual(errorLogged, true);
+  });
+
+  it('should handle file system errors gracefully (silent=true)', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    // Create a directory instead of a file
+    const dirPath = path.join(testDir, '.env.lock');
+    fs.mkdirSync(dirPath);
+
+    const result = envLock.config({
+      path: dirPath,
+      silent: true
+    });
+
+    // Should return empty object without throwing
+    assert.deepStrictEqual(result, {});
+  });
+});
