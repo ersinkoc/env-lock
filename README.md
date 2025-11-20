@@ -7,6 +7,8 @@
 
 Safely commit encrypted environment variables to version control while keeping sensitive data secure. Perfect for teams that want to share environment configurations without exposing secrets.
 
+📚 **[View Full Documentation & Examples](https://ersinkoc.github.io/env-lock/)** (Website will be available after enabling GitHub Pages)
+
 ## Features
 
 - **🔐 Military-Grade Encryption**: AES-256-GCM authenticated encryption
