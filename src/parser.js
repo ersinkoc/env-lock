@@ -124,12 +124,14 @@ function parse(content) {
  * @returns {string} Unescaped value
  */
 function unescapeValue(value) {
+  // Use a placeholder for escaped backslashes to prevent double-unescaping
   return value
+    .replace(/\\\\/g, '\x00')   // Temporarily replace \\\\ with null byte
     .replace(/\\n/g, '\n')
     .replace(/\\r/g, '\r')
     .replace(/\\t/g, '\t')
     .replace(/\\"/g, '"')
-    .replace(/\\\\/g, '\\');
+    .replace(/\x00/g, '\\');    // Restore backslashes
 }
 
 /**
@@ -158,7 +160,9 @@ function stringify(obj) {
     const needsQuotes =
       stringValue.includes('\n') ||
       stringValue.includes('\r') ||
+      stringValue.includes('\t') ||
       stringValue.includes('"') ||
+      stringValue.includes('\\') ||
       stringValue.includes('#') ||
       stringValue.startsWith(' ') ||
       stringValue.endsWith(' ');

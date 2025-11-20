@@ -1,0 +1,538 @@
+/**
+ * Comprehensive test suite for index.js (Runtime API)
+ * Tests config() method and module exports
+ */
+
+const { describe, it, beforeEach, afterEach } = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('../src/crypto.js');
+
+describe('index.js - Module Exports', () => {
+  it('should export config function', () => {
+    const envLock = require('../src/index.js');
+    assert.strictEqual(typeof envLock.config, 'function');
+  });
+
+  it('should export load function (alias)', () => {
+    const envLock = require('../src/index.js');
+    assert.strictEqual(typeof envLock.load, 'function');
+  });
+
+  it('should export encrypt function', () => {
+    const envLock = require('../src/index.js');
+    assert.strictEqual(typeof envLock.encrypt, 'function');
+  });
+
+  it('should export decrypt function', () => {
+    const envLock = require('../src/index.js');
+    assert.strictEqual(typeof envLock.decrypt, 'function');
+  });
+
+  it('should export generateKey function', () => {
+    const envLock = require('../src/index.js');
+    assert.strictEqual(typeof envLock.generateKey, 'function');
+  });
+
+  it('should export parse function', () => {
+    const envLock = require('../src/index.js');
+    assert.strictEqual(typeof envLock.parse, 'function');
+  });
+
+  it('should export stringify function', () => {
+    const envLock = require('../src/index.js');
+    assert.strictEqual(typeof envLock.stringify, 'function');
+  });
+});
+
+describe('index.js - config() Without Key', () => {
+  let envLock;
+  let originalEnv;
+
+  beforeEach(() => {
+    // Clear module cache to get fresh instance
+    delete require.cache[require.resolve('../src/index.js')];
+
+    // Save original environment
+    originalEnv = { ...process.env };
+
+    // Remove OXOG_ENV_KEY if exists
+    delete process.env.OXOG_ENV_KEY;
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    // Restore original environment
+    process.env = originalEnv;
+  });
+
+  it('should return empty object when OXOG_ENV_KEY is not set', () => {
+    const result = envLock.config({ silent: true });
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('should not throw error when key is missing', () => {
+    assert.doesNotThrow(() => {
+      envLock.config({ silent: true });
+    });
+  });
+});
+
+describe('index.js - config() With Invalid File', () => {
+  let envLock;
+  let originalEnv;
+  const testKey = crypto.generateKey();
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+    originalEnv = { ...process.env };
+    process.env.OXOG_ENV_KEY = testKey;
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should return empty object when .env.lock does not exist', () => {
+    const nonExistentPath = path.join(__dirname, 'nonexistent.env.lock');
+    const result = envLock.config({
+      path: nonExistentPath,
+      silent: true
+    });
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('should not throw error when file does not exist', () => {
+    const nonExistentPath = path.join(__dirname, 'nonexistent.env.lock');
+    assert.doesNotThrow(() => {
+      envLock.config({ path: nonExistentPath, silent: true });
+    });
+  });
+});
+
+describe('index.js - config() With Valid Encrypted File', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+  let testKey;
+  let testEnvLockPath;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+
+    // Create test directory
+    testDir = path.join(__dirname, 'temp_test_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    // Generate test key and encrypt test data
+    testKey = crypto.generateKey();
+    const testData = 'TEST_VAR1=value1\nTEST_VAR2=value2\nTEST_VAR3=value3';
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    // Write encrypted file
+    testEnvLockPath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testEnvLockPath, encrypted);
+
+    // Set up environment
+    originalEnv = { ...process.env };
+    process.env.OXOG_ENV_KEY = testKey;
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    // Clean up
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should successfully decrypt and load variables', () => {
+    const result = envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(result.TEST_VAR1, 'value1');
+    assert.strictEqual(result.TEST_VAR2, 'value2');
+    assert.strictEqual(result.TEST_VAR3, 'value3');
+  });
+
+  it('should inject variables into process.env', () => {
+    envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(process.env.TEST_VAR1, 'value1');
+    assert.strictEqual(process.env.TEST_VAR2, 'value2');
+    assert.strictEqual(process.env.TEST_VAR3, 'value3');
+  });
+
+  it('should not override existing env vars by default', () => {
+    process.env.TEST_VAR1 = 'existing_value';
+
+    envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(process.env.TEST_VAR1, 'existing_value');
+  });
+
+  it('should override existing env vars when override=true', () => {
+    process.env.TEST_VAR1 = 'existing_value';
+
+    envLock.config({
+      path: testEnvLockPath,
+      override: true,
+      silent: true
+    });
+
+    assert.strictEqual(process.env.TEST_VAR1, 'value1');
+  });
+
+  it('should return correct count in result object', () => {
+    const result = envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(Object.keys(result).length, 3);
+  });
+});
+
+describe('index.js - config() With Wrong Key', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+  let testEnvLockPath;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+
+    // Create test directory
+    testDir = path.join(__dirname, 'temp_test_wrong_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    // Generate test key and encrypt test data
+    const correctKey = crypto.generateKey();
+    const wrongKey = crypto.generateKey();
+    const testData = 'TEST_VAR=value';
+    const encrypted = crypto.encrypt(testData, correctKey);
+
+    // Write encrypted file
+    testEnvLockPath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testEnvLockPath, encrypted);
+
+    // Set up environment with WRONG key
+    originalEnv = { ...process.env };
+    process.env.OXOG_ENV_KEY = wrongKey;
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should return empty object with wrong key', () => {
+    const result = envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('should not throw error with wrong key', () => {
+    assert.doesNotThrow(() => {
+      envLock.config({ path: testEnvLockPath, silent: true });
+    });
+  });
+});
+
+describe('index.js - config() With Empty File', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+  let testEnvLockPath;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+
+    // Create test directory
+    testDir = path.join(__dirname, 'temp_test_empty_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    // Create empty file
+    testEnvLockPath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testEnvLockPath, '');
+
+    // Set up environment
+    originalEnv = { ...process.env };
+    process.env.OXOG_ENV_KEY = crypto.generateKey();
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should return empty object for empty file', () => {
+    const result = envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('should not throw error for empty file', () => {
+    assert.doesNotThrow(() => {
+      envLock.config({ path: testEnvLockPath, silent: true });
+    });
+  });
+});
+
+describe('index.js - config() Options', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+  let testKey;
+  let testEnvLockPath;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+
+    testDir = path.join(__dirname, 'temp_test_options_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    testKey = crypto.generateKey();
+    const testData = 'OPT_VAR=option_value';
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    testEnvLockPath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testEnvLockPath, encrypted);
+
+    originalEnv = { ...process.env };
+    process.env.OXOG_ENV_KEY = testKey;
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should accept custom path option', () => {
+    const result = envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(result.OPT_VAR, 'option_value');
+  });
+
+  it('should accept encoding option', () => {
+    const result = envLock.config({
+      path: testEnvLockPath,
+      encoding: 'utf8',
+      silent: true
+    });
+
+    assert.strictEqual(result.OPT_VAR, 'option_value');
+  });
+
+  it('should work with empty options object', () => {
+    // Change to test dir so default path works
+    const originalCwd = process.cwd();
+    process.chdir(testDir);
+
+    const result = envLock.config({ silent: true });
+
+    process.chdir(originalCwd);
+    assert.strictEqual(result.OPT_VAR, 'option_value');
+  });
+
+  it('should work without options parameter', () => {
+    const originalCwd = process.cwd();
+    process.chdir(testDir);
+
+    // Capture console output
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    let logged = false;
+    console.log = () => { logged = true; };
+    console.warn = () => {};
+
+    const result = envLock.config();
+
+    console.log = originalLog;
+    console.warn = originalWarn;
+    process.chdir(originalCwd);
+
+    assert.strictEqual(result.OPT_VAR, 'option_value');
+  });
+});
+
+describe('index.js - config() With Complex Data', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+  let testKey;
+  let testEnvLockPath;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+
+    testDir = path.join(__dirname, 'temp_test_complex_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    testKey = crypto.generateKey();
+    const testData = `DATABASE_URL=postgresql://user:pass@localhost:5432/db
+API_KEY="sk_test_1234567890"
+SECRET="my secret value"
+DEBUG=true
+PORT=3000
+MULTILINE="line1\\nline2"`;
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    testEnvLockPath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testEnvLockPath, encrypted);
+
+    originalEnv = { ...process.env };
+    process.env.OXOG_ENV_KEY = testKey;
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should handle complex real-world data', () => {
+    const result = envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(result.DATABASE_URL, 'postgresql://user:pass@localhost:5432/db');
+    assert.strictEqual(result.API_KEY, 'sk_test_1234567890');
+    assert.strictEqual(result.SECRET, 'my secret value');
+    assert.strictEqual(result.DEBUG, 'true');
+    assert.strictEqual(result.PORT, '3000');
+  });
+
+  it('should inject complex data into process.env', () => {
+    envLock.config({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(process.env.DATABASE_URL, 'postgresql://user:pass@localhost:5432/db');
+    assert.strictEqual(process.env.API_KEY, 'sk_test_1234567890');
+  });
+});
+
+describe('index.js - load() Alias', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+  let testKey;
+  let testEnvLockPath;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+
+    testDir = path.join(__dirname, 'temp_test_load_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+
+    testKey = crypto.generateKey();
+    const testData = 'LOAD_VAR=loaded';
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    testEnvLockPath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(testEnvLockPath, encrypted);
+
+    originalEnv = { ...process.env };
+    process.env.OXOG_ENV_KEY = testKey;
+
+    envLock = require('../src/index.js');
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should work same as config()', () => {
+    const result = envLock.load({
+      path: testEnvLockPath,
+      silent: true
+    });
+
+    assert.strictEqual(result.LOAD_VAR, 'loaded');
+    assert.strictEqual(process.env.LOAD_VAR, 'loaded');
+  });
+});
+
+describe('index.js - Exported Crypto Functions', () => {
+  const envLock = require('../src/index.js');
+
+  it('should encrypt and decrypt correctly', () => {
+    const key = envLock.generateKey();
+    const plaintext = 'test data';
+    const encrypted = envLock.encrypt(plaintext, key);
+    const decrypted = envLock.decrypt(encrypted, key);
+
+    assert.strictEqual(decrypted, plaintext);
+  });
+
+  it('should generate valid keys', () => {
+    const key = envLock.generateKey();
+    assert.strictEqual(key.length, 64);
+    assert.match(key, /^[0-9a-f]{64}$/);
+  });
+});
+
+describe('index.js - Exported Parser Functions', () => {
+  const envLock = require('../src/index.js');
+
+  it('should parse .env content correctly', () => {
+    const content = 'KEY1=value1\nKEY2=value2';
+    const parsed = envLock.parse(content);
+
+    assert.deepStrictEqual(parsed, {
+      KEY1: 'value1',
+      KEY2: 'value2'
+    });
+  });
+
+  it('should stringify object correctly', () => {
+    const obj = { KEY1: 'value1', KEY2: 'value2' };
+    const stringified = envLock.stringify(obj);
+
+    assert.ok(stringified.includes('KEY1=value1'));
+    assert.ok(stringified.includes('KEY2=value2'));
+  });
+});

@@ -34,8 +34,8 @@ function generateKey() {
  */
 function encrypt(text, keyHex) {
   // Validate input
-  if (!text || typeof text !== 'string') {
-    throw new Error('Text to encrypt must be a non-empty string');
+  if (text === undefined || text === null || typeof text !== 'string') {
+    throw new Error('Text to encrypt must be a string');
   }
 
   if (!keyHex || typeof keyHex !== 'string') {
@@ -80,8 +80,12 @@ function encrypt(text, keyHex) {
  */
 function decrypt(cipherText, keyHex) {
   // Validate input
-  if (!cipherText || typeof cipherText !== 'string') {
-    throw new Error('Cipher text must be a non-empty string');
+  if (cipherText === undefined || cipherText === null || typeof cipherText !== 'string') {
+    throw new Error('Cipher text must be a string');
+  }
+
+  if (!cipherText) {
+    throw new Error('Cipher text cannot be empty');
   }
 
   if (!keyHex || typeof keyHex !== 'string') {
