@@ -1,0 +1,61 @@
+# Docker Compose Example for @oxog/env-lock
+#
+# Save this as docker-compose.yml
+
+version: '3.8'
+
+services:
+  # Your application
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Method 1: Pass the key directly
+      OXOG_ENV_KEY: ${OXOG_ENV_KEY}
+      NODE_ENV: production
+    volumes:
+      # The encrypted .env.lock is already in the container
+      # No need to mount sensitive files!
+      - ./logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      - database
+      - redis
+
+  # Database service
+  database:
+    image: postgres:14-alpine
+    environment:
+      # These are separate from your app's encrypted variables
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-myapp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+# Usage:
+#
+# 1. Create a .env file with the encryption key (add to .gitignore!):
+#    echo "OXOG_ENV_KEY=your_key_here" > .env
+#
+# 2. Start services:
+#    docker-compose up -d
+#
+# 3. View logs:
+#    docker-compose logs -f app
+#
+# 4. Stop services:
+#    docker-compose down
+#
+# For production, use:
+#    docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d

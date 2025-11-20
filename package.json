@@ -1,0 +1,42 @@
+{
+  "name": "@oxog/env-lock",
+  "version": "1.0.0",
+  "description": "Zero-dependency tool to encrypt .env files into secure .env.lock files using AES-256-GCM encryption",
+  "main": "src/index.js",
+  "bin": {
+    "env-lock": "bin/cli.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage test/*.test.js"
+  },
+  "keywords": [
+    "env",
+    "dotenv",
+    "encryption",
+    "security",
+    "aes-256-gcm",
+    "environment",
+    "config",
+    "zero-dependency"
+  ],
+  "author": "Ersin Koc",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ersinkoc/env-lock.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ersinkoc/env-lock/issues"
+  },
+  "homepage": "https://github.com/ersinkoc/env-lock#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "src/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ]
+}

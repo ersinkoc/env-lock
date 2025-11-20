@@ -1,0 +1,49 @@
+# Dockerfile Example for @oxog/env-lock
+#
+# This shows how to use env-lock in a Docker container.
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Copy the encrypted .env.lock file (safe to commit!)
+# The .env.lock file is already in the repository
+# COPY .env.lock ./
+
+# The OXOG_ENV_KEY will be passed at runtime via environment variable
+# This can be done through:
+# - docker run -e OXOG_ENV_KEY=...
+# - docker-compose environment variables
+# - Kubernetes secrets
+# - Cloud provider secret managers
+
+# Expose port
+EXPOSE 3000
+
+# Start the application
+# The app will automatically decrypt .env.lock using OXOG_ENV_KEY
+CMD ["node", "index.js"]
+
+# Usage examples:
+#
+# 1. Build the image:
+#    docker build -t myapp .
+#
+# 2. Run with encryption key:
+#    docker run -e OXOG_ENV_KEY=your_key_here -p 3000:3000 myapp
+#
+# 3. Run with key from file:
+#    docker run -e OXOG_ENV_KEY=$(cat .env.key) -p 3000:3000 myapp
+#
+# 4. Run with all environment variables:
+#    docker run --env-file .env.docker -p 3000:3000 myapp
+#    # .env.docker contains: OXOG_ENV_KEY=your_key_here

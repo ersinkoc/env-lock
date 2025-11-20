@@ -1,0 +1,93 @@
+# GitHub Actions CI/CD Example for @oxog/env-lock
+#
+# This workflow demonstrates how to use env-lock in CI/CD pipelines.
+# Place this file in .github/workflows/deploy.yml
+
+name: Deploy with Encrypted Environment
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+        env:
+          # Set the encryption key from GitHub Secrets
+          OXOG_ENV_KEY: ${{ secrets.OXOG_ENV_KEY }}
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Decrypt environment variables
+        run: |
+          # The .env.lock file is committed to the repository (it's encrypted!)
+          # The OXOG_ENV_KEY is stored in GitHub Secrets
+          npx env-lock decrypt > .env.decrypted
+        env:
+          OXOG_ENV_KEY: ${{ secrets.OXOG_ENV_KEY }}
+
+      - name: Deploy to production
+        run: |
+          # Your deployment script here
+          # The decrypted variables are available
+          source .env.decrypted
+          echo "Deploying to $ENVIRONMENT..."
+          # npm run deploy
+        env:
+          OXOG_ENV_KEY: ${{ secrets.OXOG_ENV_KEY }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Always remove decrypted files
+          rm -f .env.decrypted
+
+# How to set up GitHub Secrets:
+# 1. Generate an encryption key:
+#    npx @oxog/env-lock generate-key
+#
+# 2. Encrypt your .env file:
+#    npx @oxog/env-lock encrypt
+#
+# 3. Commit .env.lock to your repository:
+#    git add .env.lock
+#    git commit -m "Add encrypted environment variables"
+#
+# 4. Add OXOG_ENV_KEY to GitHub Secrets:
+#    - Go to repository Settings → Secrets and variables → Actions
+#    - Click "New repository secret"
+#    - Name: OXOG_ENV_KEY
+#    - Value: (paste your generated key)
+#    - Click "Add secret"
