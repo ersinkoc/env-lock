@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - env-lock</title>
+    <meta name="description" content="Complete documentation for env-lock - secure environment variable encryption">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(214.3 31.8% 91.4%)",
+                        background: "hsl(0 0% 100%)",
+                        foreground: "hsl(222.2 84% 4.9%)",
+                        primary: {
+                            DEFAULT: "hsl(222.2 47.4% 11.2%)",
+                            foreground: "hsl(210 40% 98%)",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(222.2 47.4% 11.2%)",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(222.2 47.4% 11.2%)",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(215.4 16.3% 46.9%)",
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .code-block {
+            background: hsl(222.2 84% 4.9%);
+            color: hsl(210 40% 98%);
+        }
+        .sidebar-active {
+            background: hsl(210 40% 96.1%);
+            border-left: 3px solid hsl(222.2 47.4% 11.2%);
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground">
+    <!-- Navigation -->
+    <nav class="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex h-16 items-center justify-between">
+                <div class="flex items-center">
+                    <a href="index.html" class="text-2xl font-bold">
+                        <span class="text-primary">env-lock</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-8">
+                    <a href="index.html" class="text-sm font-medium hover:text-primary transition-colors">Home</a>
+                    <a href="docs.html" class="text-sm font-medium text-primary">Docs</a>
+                    <a href="examples.html" class="text-sm font-medium hover:text-primary transition-colors">Examples</a>
+                    <a href="https://github.com/ersinkoc/env-lock" target="_blank" class="text-sm font-medium hover:text-primary transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="flex gap-8">
+            <!-- Sidebar -->
+            <aside class="hidden lg:block w-64 flex-shrink-0">
+                <div class="sticky top-24 space-y-1" x-data="{ active: 'installation' }">
+                    <a href="#installation" @click="active = 'installation'" :class="active === 'installation' ? 'sidebar-active' : ''" class="block px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors">Installation</a>
+                    <a href="#quick-start" @click="active = 'quick-start'" :class="active === 'quick-start' ? 'sidebar-active' : ''" class="block px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors">Quick Start</a>
+                    <a href="#cli" @click="active = 'cli'" :class="active === 'cli' ? 'sidebar-active' : ''" class="block px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors">CLI Commands</a>
+                    <a href="#api" @click="active = 'api'" :class="active === 'api' ? 'sidebar-active' : ''" class="block px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors">API Reference</a>
+                    <a href="#security" @click="active = 'security'" :class="active === 'security' ? 'sidebar-active' : ''" class="block px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors">Security</a>
+                    <a href="#deployment" @click="active = 'deployment'" :class="active === 'deployment' ? 'sidebar-active' : ''" class="block px-4 py-2 text-sm hover:bg-accent rounded-md transition-colors">Deployment</a>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1 max-w-4xl">
+                <h1 class="text-4xl font-bold mb-8">Documentation</h1>
+
+                <!-- Installation -->
+                <section id="installation" class="mb-12">
+                    <h2 class="text-3xl font-bold mb-4 pb-2 border-b border-border">Installation</h2>
+                    <p class="text-muted-foreground mb-4">Install env-lock via npm:</p>
+                    <div class="code-block rounded-lg p-4 mb-4">
+                        <code>npm install @oxog/env-lock</code>
+                    </div>
+                    <p class="text-muted-foreground mb-4">Or using yarn:</p>
+                    <div class="code-block rounded-lg p-4">
+                        <code>yarn add @oxog/env-lock</code>
+                    </div>
+                </section>
+
+                <!-- Quick Start -->
+                <section id="quick-start" class="mb-12">
+                    <h2 class="text-3xl font-bold mb-4 pb-2 border-b border-border">Quick Start</h2>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">1. Generate Encryption Key</h3>
+                    <div class="code-block rounded-lg p-4 mb-4">
+                        <code>npx env-lock generate-key</code>
+                    </div>
+                    <p class="text-muted-foreground mb-4">Save this key securely. You'll need it to decrypt your environment variables.</p>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">2. Encrypt Your .env File</h3>
+                    <div class="code-block rounded-lg p-4 mb-4">
+                        <code>npx env-lock encrypt --key YOUR_GENERATED_KEY</code>
+                    </div>
+                    <p class="text-muted-foreground mb-4">This creates a .env.lock file that you can safely commit to git.</p>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">3. Use in Your Application</h3>
+                    <div class="code-block rounded-lg p-4 mb-4">
+<pre><code>// Load at the top of your app (before other imports)
+require('@oxog/env-lock').config();
+
+// Now use process.env as normal
+const dbUrl = process.env.DATABASE_URL;
+const apiKey = process.env.API_KEY;</code></pre>
+                    </div>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">4. Set the Decryption Key</h3>
+                    <p class="text-muted-foreground mb-4">Pass the encryption key via environment variable:</p>
+                    <div class="code-block rounded-lg p-4">
+                        <code>OXOG_ENV_KEY=your_key_here node index.js</code>
+                    </div>
+                </section>
+
+                <!-- CLI Commands -->
+                <section id="cli" class="mb-12">
+                    <h2 class="text-3xl font-bold mb-4 pb-2 border-b border-border">CLI Commands</h2>
+
+                    <div class="space-y-6">
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">generate-key</h3>
+                            <p class="text-muted-foreground mb-3">Generate a cryptographically secure 256-bit encryption key</p>
+                            <div class="code-block rounded-lg p-4 mb-3">
+                                <code>npx env-lock generate-key</code>
+                            </div>
+                            <p class="text-sm text-muted-foreground">Alias: <code class="bg-secondary px-2 py-1 rounded">genkey</code></p>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">encrypt</h3>
+                            <p class="text-muted-foreground mb-3">Encrypt a .env file to .env.lock</p>
+                            <div class="code-block rounded-lg p-4 mb-3">
+<pre><code>npx env-lock encrypt --key YOUR_KEY
+
+# Options:
+--key, -k      Encryption key (generates new if not provided)
+--input, -i    Input file path (default: .env)
+--output, -o   Output file path (default: .env.lock)</code></pre>
+                            </div>
+                            <p class="text-sm text-muted-foreground mb-2"><strong>Examples:</strong></p>
+                            <div class="code-block rounded-lg p-4 text-sm">
+<pre><code># Encrypt .env to .env.lock
+npx env-lock encrypt --key abc123...
+
+# Encrypt custom file
+npx env-lock encrypt -i .env.production -o .env.production.lock -k abc123...</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">decrypt</h3>
+                            <p class="text-muted-foreground mb-3">Decrypt a .env.lock file</p>
+                            <div class="code-block rounded-lg p-4 mb-3">
+<pre><code>npx env-lock decrypt --key YOUR_KEY
+
+# Options:
+--key, -k      Decryption key (or use OXOG_ENV_KEY env var)
+--input, -i    Input file path (default: .env.lock)
+--output, -o   Output file path (outputs to stdout if not provided)</code></pre>
+                            </div>
+                            <p class="text-sm text-muted-foreground mb-2"><strong>Examples:</strong></p>
+                            <div class="code-block rounded-lg p-4 text-sm">
+<pre><code># Decrypt to stdout
+npx env-lock decrypt --key abc123...
+
+# Decrypt to file
+npx env-lock decrypt -k abc123... -o .env.decrypted
+
+# Use environment variable for key
+OXOG_ENV_KEY=abc123... npx env-lock decrypt</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">help</h3>
+                            <p class="text-muted-foreground mb-3">Display help information</p>
+                            <div class="code-block rounded-lg p-4">
+                                <code>npx env-lock help</code>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- API Reference -->
+                <section id="api" class="mb-12">
+                    <h2 class="text-3xl font-bold mb-4 pb-2 border-b border-border">API Reference</h2>
+
+                    <div class="space-y-6">
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">config([options])</h3>
+                            <p class="text-muted-foreground mb-3">Load and decrypt environment variables from .env.lock</p>
+                            <div class="code-block rounded-lg p-4 mb-3">
+<pre><code>const envLock = require('@oxog/env-lock');
+
+// Load with defaults
+envLock.config();
+
+// Load with options
+envLock.config({
+  path: '.env.production.lock',
+  encoding: 'utf8',
+  override: true,
+  silent: false
+});</code></pre>
+                            </div>
+                            <p class="text-sm font-semibold mb-2">Options:</p>
+                            <ul class="text-sm text-muted-foreground space-y-2 ml-4">
+                                <li><code class="bg-secondary px-2 py-1 rounded">path</code> - Path to .env.lock file (default: '.env.lock')</li>
+                                <li><code class="bg-secondary px-2 py-1 rounded">encoding</code> - File encoding (default: 'utf8')</li>
+                                <li><code class="bg-secondary px-2 py-1 rounded">override</code> - Override existing env vars (default: false)</li>
+                                <li><code class="bg-secondary px-2 py-1 rounded">silent</code> - Suppress console output (default: true)</li>
+                            </ul>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">generateKey()</h3>
+                            <p class="text-muted-foreground mb-3">Generate a 256-bit encryption key</p>
+                            <div class="code-block rounded-lg p-4">
+<pre><code>const { generateKey } = require('@oxog/env-lock');
+
+const key = generateKey();
+console.log(key); // 64-character hex string</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">encrypt(text, key)</h3>
+                            <p class="text-muted-foreground mb-3">Encrypt plaintext using AES-256-GCM</p>
+                            <div class="code-block rounded-lg p-4">
+<pre><code>const { encrypt, generateKey } = require('@oxog/env-lock');
+
+const key = generateKey();
+const encrypted = encrypt('SECRET_VALUE=my_secret', key);
+console.log(encrypted); // IV:TAG:DATA format</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">decrypt(ciphertext, key)</h3>
+                            <p class="text-muted-foreground mb-3">Decrypt encrypted data</p>
+                            <div class="code-block rounded-lg p-4">
+<pre><code>const { decrypt } = require('@oxog/env-lock');
+
+const decrypted = decrypt(encrypted, key);
+console.log(decrypted); // Original plaintext</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">parse(content)</h3>
+                            <p class="text-muted-foreground mb-3">Parse .env file content into an object</p>
+                            <div class="code-block rounded-lg p-4">
+<pre><code>const { parse } = require('@oxog/env-lock');
+
+const content = 'DATABASE_URL=postgresql://...\nAPI_KEY=sk_test_123';
+const parsed = parse(content);
+// { DATABASE_URL: 'postgresql://...', API_KEY: 'sk_test_123' }</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="border border-border rounded-lg p-6">
+                            <h3 class="text-xl font-semibold mb-3">stringify(obj)</h3>
+                            <p class="text-muted-foreground mb-3">Convert object to .env file format</p>
+                            <div class="code-block rounded-lg p-4">
+<pre><code>const { stringify } = require('@oxog/env-lock');
+
+const obj = { DATABASE_URL: 'postgresql://...', API_KEY: 'sk_test_123' };
+const content = stringify(obj);
+// DATABASE_URL=postgresql://...\nAPI_KEY=sk_test_123</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Security -->
+                <section id="security" class="mb-12">
+                    <h2 class="text-3xl font-bold mb-4 pb-2 border-b border-border">Security</h2>
+
+                    <div class="bg-accent border border-border rounded-lg p-6 mb-6">
+                        <h3 class="text-xl font-semibold mb-3">Encryption Details</h3>
+                        <ul class="space-y-2 text-muted-foreground">
+                            <li>• Algorithm: AES-256-GCM (Galois/Counter Mode)</li>
+                            <li>• Key length: 256 bits (32 bytes)</li>
+                            <li>• IV length: 96 bits (12 bytes)</li>
+                            <li>• Authentication tag: 128 bits (16 bytes)</li>
+                            <li>• Random IV per encryption operation</li>
+                        </ul>
+                    </div>
+
+                    <h3 class="text-xl font-semibold mb-3">Best Practices</h3>
+                    <div class="space-y-4">
+                        <div class="border-l-4 border-primary pl-4">
+                            <p class="font-semibold mb-1">Keep the encryption key secret</p>
+                            <p class="text-sm text-muted-foreground">Never commit OXOG_ENV_KEY to version control. Store it in a secure location.</p>
+                        </div>
+                        <div class="border-l-4 border-primary pl-4">
+                            <p class="font-semibold mb-1">Use different keys for different environments</p>
+                            <p class="text-sm text-muted-foreground">Separate keys for development, staging, and production.</p>
+                        </div>
+                        <div class="border-l-4 border-primary pl-4">
+                            <p class="font-semibold mb-1">Rotate keys periodically</p>
+                            <p class="text-sm text-muted-foreground">Generate new keys and re-encrypt your files regularly.</p>
+                        </div>
+                        <div class="border-l-4 border-primary pl-4">
+                            <p class="font-semibold mb-1">Use environment-specific .env.lock files</p>
+                            <p class="text-sm text-muted-foreground">Create .env.production.lock, .env.staging.lock, etc.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Deployment -->
+                <section id="deployment" class="mb-12">
+                    <h2 class="text-3xl font-bold mb-4 pb-2 border-b border-border">Deployment</h2>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">Docker</h3>
+                    <div class="code-block rounded-lg p-4 mb-4">
+<pre><code># Pass the key at runtime
+docker run -e OXOG_ENV_KEY=your_key myapp
+
+# Or via docker-compose
+environment:
+  OXOG_ENV_KEY: ${OXOG_ENV_KEY}</code></pre>
+                    </div>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">GitHub Actions</h3>
+                    <div class="code-block rounded-lg p-4 mb-4">
+<pre><code># Add OXOG_ENV_KEY to repository secrets
+# Then use in workflow:
+- name: Run tests
+  run: npm test
+  env:
+    OXOG_ENV_KEY: ${{ secrets.OXOG_ENV_KEY }}</code></pre>
+                    </div>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">Kubernetes</h3>
+                    <div class="code-block rounded-lg p-4 mb-4">
+<pre><code># Create secret
+kubectl create secret generic env-key \
+  --from-literal=OXOG_ENV_KEY=your_key
+
+# Reference in deployment
+env:
+  - name: OXOG_ENV_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-key
+        key: OXOG_ENV_KEY</code></pre>
+                    </div>
+
+                    <h3 class="text-xl font-semibold mb-3 mt-6">Cloud Platforms</h3>
+                    <div class="space-y-4">
+                        <div class="border border-border rounded-lg p-4">
+                            <p class="font-semibold mb-2">Heroku</p>
+                            <div class="code-block rounded-lg p-3 text-sm">
+                                <code>heroku config:set OXOG_ENV_KEY=your_key</code>
+                            </div>
+                        </div>
+                        <div class="border border-border rounded-lg p-4">
+                            <p class="font-semibold mb-2">AWS / Azure / GCP</p>
+                            <p class="text-sm text-muted-foreground">Use platform-specific secret managers and inject OXOG_ENV_KEY as an environment variable</p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-border py-8 mt-12">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-muted-foreground text-sm">
+                    © 2024 env-lock. Licensed under MIT.
+                </div>
+                <div class="flex gap-6">
+                    <a href="https://github.com/ersinkoc/env-lock" target="_blank" class="text-muted-foreground hover:text-foreground">GitHub</a>
+                    <a href="https://www.npmjs.com/package/@oxog/env-lock" target="_blank" class="text-muted-foreground hover:text-foreground">npm</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

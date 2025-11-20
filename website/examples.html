@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examples - env-lock</title>
+    <meta name="description" content="Real-world examples and use cases for env-lock">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(214.3 31.8% 91.4%)",
+                        background: "hsl(0 0% 100%)",
+                        foreground: "hsl(222.2 84% 4.9%)",
+                        primary: {
+                            DEFAULT: "hsl(222.2 47.4% 11.2%)",
+                            foreground: "hsl(210 40% 98%)",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(222.2 47.4% 11.2%)",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(222.2 47.4% 11.2%)",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(210 40% 96.1%)",
+                            foreground: "hsl(215.4 16.3% 46.9%)",
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        .code-block {
+            background: hsl(222.2 84% 4.9%);
+            color: hsl(210 40% 98%);
+        }
+        .tab-active {
+            background: hsl(222.2 47.4% 11.2%);
+            color: hsl(210 40% 98%);
+        }
+    </style>
+</head>
+<body class="bg-background text-foreground">
+    <!-- Navigation -->
+    <nav class="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex h-16 items-center justify-between">
+                <div class="flex items-center">
+                    <a href="index.html" class="text-2xl font-bold">
+                        <span class="text-primary">env-lock</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-8">
+                    <a href="index.html" class="text-sm font-medium hover:text-primary transition-colors">Home</a>
+                    <a href="docs.html" class="text-sm font-medium hover:text-primary transition-colors">Docs</a>
+                    <a href="examples.html" class="text-sm font-medium text-primary">Examples</a>
+                    <a href="https://github.com/ersinkoc/env-lock" target="_blank" class="text-sm font-medium hover:text-primary transition-colors">GitHub</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 class="text-4xl font-bold mb-4">Examples</h1>
+        <p class="text-xl text-muted-foreground mb-12">Real-world examples and use cases</p>
+
+        <!-- Basic Usage -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Basic Usage</h2>
+            <div class="border border-border rounded-lg overflow-hidden">
+                <div class="bg-accent p-4 border-b border-border">
+                    <h3 class="font-semibold">Simple Node.js Application</h3>
+                </div>
+                <div class="code-block p-6">
+<pre><code>// index.js
+
+// IMPORTANT: Load env-lock BEFORE other modules
+require('@oxog/env-lock').config();
+
+// Now you can safely use environment variables
+const express = require('express');
+const app = express();
+
+const PORT = process.env.PORT || 3000;
+const DATABASE_URL = process.env.DATABASE_URL;
+const API_KEY = process.env.API_KEY;
+
+app.get('/health', (req, res) =&gt; {
+  res.json({
+    status: 'healthy',
+    database: !!DATABASE_URL,
+    apiKey: !!API_KEY
+  });
+});
+
+app.listen(PORT, () =&gt; {
+  console.log(`Server running on port ${PORT}`);
+});</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Express.js Integration -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Express.js Integration</h2>
+            <div class="border border-border rounded-lg overflow-hidden">
+                <div class="bg-accent p-4 border-b border-border">
+                    <h3 class="font-semibold">Production Express App</h3>
+                </div>
+                <div class="code-block p-6">
+<pre><code>// app.js
+require('@oxog/env-lock').config();
+
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+
+const app = express();
+
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+
+// Database connection
+const db = require('./database');
+db.connect(process.env.DATABASE_URL)
+  .then(() =&gt; console.log('Database connected'))
+  .catch(err =&gt; console.error('Database error:', err));
+
+// Routes
+app.get('/api/data', async (req, res) =&gt; {
+  // Use API key from encrypted env
+  const data = await fetch('https://api.example.com/data', {
+    headers: {
+      'Authorization': `Bearer ${process.env.API_KEY}`
+    }
+  });
+  res.json(await data.json());
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () =&gt; {
+  console.log(`Server running on ${PORT}`);
+});</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Docker -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Docker Deployment</h2>
+
+            <div x-data="{ activeTab: 'dockerfile' }" class="border border-border rounded-lg overflow-hidden">
+                <div class="flex border-b border-border bg-accent">
+                    <button @click="activeTab = 'dockerfile'" :class="activeTab === 'dockerfile' ? 'tab-active' : ''" class="px-6 py-3 font-medium transition-colors">Dockerfile</button>
+                    <button @click="activeTab = 'compose'" :class="activeTab === 'compose' ? 'tab-active' : ''" class="px-6 py-3 font-medium transition-colors">docker-compose.yml</button>
+                    <button @click="activeTab = 'usage'" :class="activeTab === 'usage' ? 'tab-active' : ''" class="px-6 py-3 font-medium transition-colors">Usage</button>
+                </div>
+
+                <div x-show="activeTab === 'dockerfile'" class="code-block p-6">
+<pre><code>FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code and encrypted .env.lock
+COPY . .
+
+# The OXOG_ENV_KEY will be passed at runtime
+EXPOSE 3000
+
+CMD ["node", "index.js"]</code></pre>
+                </div>
+
+                <div x-show="activeTab === 'compose'" class="code-block p-6">
+<pre><code>version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Pass the encryption key
+      OXOG_ENV_KEY: ${OXOG_ENV_KEY}
+      NODE_ENV: production
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      - database
+      - redis
+
+  database:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-myapp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  postgres_data:</code></pre>
+                </div>
+
+                <div x-show="activeTab === 'usage'" class="code-block p-6">
+<pre><code># Create .env file with the key (DON'T commit this!)
+echo "OXOG_ENV_KEY=your_key_here" &gt; .env
+
+# Build and start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f app
+
+# Stop services
+docker-compose down</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- GitHub Actions -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">CI/CD with GitHub Actions</h2>
+            <div class="border border-border rounded-lg overflow-hidden">
+                <div class="bg-accent p-4 border-b border-border">
+                    <h3 class="font-semibold">.github/workflows/deploy.yml</h3>
+                </div>
+                <div class="code-block p-6">
+<pre><code>name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+        env:
+          # Encryption key from GitHub Secrets
+          OXOG_ENV_KEY: ${{ secrets.OXOG_ENV_KEY }}
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to production
+        run: |
+          # Your deployment script
+          npm run deploy
+        env:
+          OXOG_ENV_KEY: ${{ secrets.OXOG_ENV_KEY }}</code></pre>
+                </div>
+                <div class="bg-accent p-4 border-t border-border">
+                    <p class="text-sm text-muted-foreground">
+                        <strong>Setup:</strong> Add OXOG_ENV_KEY to GitHub repository secrets
+                        (Settings → Secrets and variables → Actions → New repository secret)
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Multi-Environment -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Multi-Environment Setup</h2>
+            <div class="border border-border rounded-lg overflow-hidden">
+                <div class="bg-accent p-4 border-b border-border">
+                    <h3 class="font-semibold">Separate environments with different keys</h3>
+                </div>
+                <div class="code-block p-6">
+<pre><code>// config.js
+
+const envLock = require('@oxog/env-lock');
+
+// Determine environment
+const env = process.env.NODE_ENV || 'development';
+
+// Load appropriate encrypted file
+const envFile = `.env.${env}.lock`;
+
+envLock.config({
+  path: envFile,
+  silent: false
+});
+
+console.log(`Loaded ${env} environment`);
+
+module.exports = {
+  port: process.env.PORT,
+  database: process.env.DATABASE_URL,
+  apiKey: process.env.API_KEY,
+  environment: env
+};</code></pre>
+                </div>
+            </div>
+            <div class="mt-4 bg-secondary border border-border rounded-lg p-6">
+                <h4 class="font-semibold mb-3">File Structure:</h4>
+                <div class="code-block p-4 text-sm">
+<pre><code>.env.development.lock  # Encrypted dev variables
+.env.staging.lock      # Encrypted staging variables
+.env.production.lock   # Encrypted production variables</code></pre>
+                </div>
+                <p class="text-sm text-muted-foreground mt-3">
+                    Each environment has its own encryption key stored securely in the deployment environment.
+                </p>
+            </div>
+        </section>
+
+        <!-- Kubernetes -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Kubernetes Deployment</h2>
+
+            <div x-data="{ activeTab: 'secret' }" class="border border-border rounded-lg overflow-hidden">
+                <div class="flex border-b border-border bg-accent">
+                    <button @click="activeTab = 'secret'" :class="activeTab === 'secret' ? 'tab-active' : ''" class="px-6 py-3 font-medium transition-colors">Secret</button>
+                    <button @click="activeTab = 'deployment'" :class="activeTab === 'deployment' ? 'tab-active' : ''" class="px-6 py-3 font-medium transition-colors">Deployment</button>
+                    <button @click="activeTab = 'commands'" :class="activeTab === 'commands' ? 'tab-active' : ''" class="px-6 py-3 font-medium transition-colors">Commands</button>
+                </div>
+
+                <div x-show="activeTab === 'secret'" class="code-block p-6">
+<pre><code>apiVersion: v1
+kind: Secret
+metadata:
+  name: env-encryption-key
+type: Opaque
+stringData:
+  OXOG_ENV_KEY: "your_encryption_key_here"</code></pre>
+                </div>
+
+                <div x-show="activeTab === 'deployment'" class="code-block p-6">
+<pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp
+        image: myapp:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: OXOG_ENV_KEY
+          valueFrom:
+            secretKeyRef:
+              name: env-encryption-key
+              key: OXOG_ENV_KEY
+        - name: NODE_ENV
+          value: "production"</code></pre>
+                </div>
+
+                <div x-show="activeTab === 'commands'" class="code-block p-6">
+<pre><code># Create the secret
+kubectl create secret generic env-encryption-key \
+  --from-literal=OXOG_ENV_KEY=your_key_here
+
+# Apply deployment
+kubectl apply -f deployment.yaml
+
+# Check pods
+kubectl get pods
+
+# View logs
+kubectl logs -f deployment/myapp</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced Usage -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Advanced Usage</h2>
+            <div class="border border-border rounded-lg overflow-hidden">
+                <div class="bg-accent p-4 border-b border-border">
+                    <h3 class="font-semibold">Custom Encryption/Decryption</h3>
+                </div>
+                <div class="code-block p-6">
+<pre><code>const envLock = require('@oxog/env-lock');
+
+// Generate a new key
+const key = envLock.generateKey();
+console.log('Generated key:', key);
+
+// Encrypt data directly
+const plaintext = 'DATABASE_URL=postgresql://...\nAPI_KEY=sk_test_123';
+const encrypted = envLock.encrypt(plaintext, key);
+console.log('Encrypted:', encrypted);
+
+// Decrypt data
+const decrypted = envLock.decrypt(encrypted, key);
+console.log('Decrypted:', decrypted);
+
+// Parse .env content
+const parsed = envLock.parse(plaintext);
+console.log('Parsed:', parsed);
+// { DATABASE_URL: 'postgresql://...', API_KEY: 'sk_test_123' }
+
+// Stringify object
+const obj = { DATABASE_URL: 'postgresql://...', API_KEY: 'sk_test_123' };
+const content = envLock.stringify(obj);
+console.log('Stringified:', content);</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Migration from dotenv -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Migration from dotenv</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="border border-border rounded-lg overflow-hidden">
+                    <div class="bg-red-50 border-b border-border p-4">
+                        <h3 class="font-semibold text-red-900">Before (dotenv)</h3>
+                    </div>
+                    <div class="code-block p-6">
+<pre><code>// Old way
+require('dotenv').config();
+
+// .env file (NOT safe in git!)
+DATABASE_URL=postgresql://...
+API_KEY=sk_live_secret123
+STRIPE_KEY=sk_live_xyz</code></pre>
+                    </div>
+                </div>
+
+                <div class="border border-border rounded-lg overflow-hidden">
+                    <div class="bg-green-50 border-b border-border p-4">
+                        <h3 class="font-semibold text-green-900">After (env-lock)</h3>
+                    </div>
+                    <div class="code-block p-6">
+<pre><code>// New way - same API!
+require('@oxog/env-lock').config();
+
+// .env.lock file (SAFE in git!)
+abc123...def456 (encrypted data)
+
+// Key stored securely
+OXOG_ENV_KEY=your_key</code></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 bg-accent border border-border rounded-lg p-6">
+                <h4 class="font-semibold mb-3">Migration Steps:</h4>
+                <ol class="space-y-2 text-muted-foreground">
+                    <li>1. Install env-lock: <code class="bg-secondary px-2 py-1 rounded">npm install @oxog/env-lock</code></li>
+                    <li>2. Generate key: <code class="bg-secondary px-2 py-1 rounded">npx env-lock generate-key</code></li>
+                    <li>3. Encrypt .env: <code class="bg-secondary px-2 py-1 rounded">npx env-lock encrypt --key YOUR_KEY</code></li>
+                    <li>4. Replace <code class="bg-secondary px-2 py-1 rounded">require('dotenv')</code> with <code class="bg-secondary px-2 py-1 rounded">require('@oxog/env-lock')</code></li>
+                    <li>5. Add .env.lock to git, remove .env from git</li>
+                    <li>6. Set OXOG_ENV_KEY in your deployment environment</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- Best Practices -->
+        <section class="mb-12">
+            <h2 class="text-3xl font-bold mb-6 pb-2 border-b border-border">Best Practices</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="border border-border rounded-lg p-6">
+                    <div class="flex items-start gap-3">
+                        <svg class="h-6 w-6 text-green-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <div>
+                            <h3 class="font-semibold mb-2">DO commit .env.lock</h3>
+                            <p class="text-sm text-muted-foreground">It's encrypted and safe for version control</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-border rounded-lg p-6">
+                    <div class="flex items-start gap-3">
+                        <svg class="h-6 w-6 text-red-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <div>
+                            <h3 class="font-semibold mb-2">DON'T commit the encryption key</h3>
+                            <p class="text-sm text-muted-foreground">Never commit OXOG_ENV_KEY to git</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-border rounded-lg p-6">
+                    <div class="flex items-start gap-3">
+                        <svg class="h-6 w-6 text-green-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <div>
+                            <h3 class="font-semibold mb-2">DO use different keys per environment</h3>
+                            <p class="text-sm text-muted-foreground">Separate keys for dev, staging, production</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-border rounded-lg p-6">
+                    <div class="flex items-start gap-3">
+                        <svg class="h-6 w-6 text-green-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <div>
+                            <h3 class="font-semibold mb-2">DO rotate keys periodically</h3>
+                            <p class="text-sm text-muted-foreground">Generate new keys and re-encrypt regularly</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-border py-8 mt-12">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-muted-foreground text-sm">
+                    © 2024 env-lock. Licensed under MIT.
+                </div>
+                <div class="flex gap-6">
+                    <a href="https://github.com/ersinkoc/env-lock" target="_blank" class="text-muted-foreground hover:text-foreground">GitHub</a>
+                    <a href="https://www.npmjs.com/package/@oxog/env-lock" target="_blank" class="text-muted-foreground hover:text-foreground">npm</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
