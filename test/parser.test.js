@@ -190,6 +190,30 @@ describe('parser.js - Multiline Values', () => {
     assert.ok(result.KEY.includes('line 1'));
     assert.ok(result.KEY.includes('line 2'));
   });
+
+  it('should handle trailing whitespace after closing quote on multiline values', () => {
+    // BUG-002: Parser incorrectly removed trailing whitespace char instead of closing quote
+    const content = 'KEY="first line\nsecond line"   \nOTHER=value';
+    const result = parser.parse(content);
+    assert.strictEqual(result.KEY, 'first line\nsecond line');
+    assert.strictEqual(result.OTHER, 'value');
+  });
+
+  it('should warn about unclosed double quotes at EOF', () => {
+    // BUG-003: Unclosed quotes consume entire file
+    const warnings = [];
+    const originalWarn = console.warn;
+    console.warn = (msg) => warnings.push(msg);
+
+    const content = 'KEY="unclosed value\nmore lines';
+    const result = parser.parse(content);
+
+    console.warn = originalWarn;
+
+    assert.strictEqual(result.KEY, 'unclosed value\nmore lines');
+    assert.strictEqual(warnings.length, 1);
+    assert.ok(warnings[0].includes('Unclosed double quote'));
+  });
 });
 
 describe('parser.js - Edge Cases', () => {

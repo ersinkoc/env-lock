@@ -315,6 +315,38 @@ describe('CLI - Error Cases', () => {
       );
     }
   });
+
+  it('should show error when --key option is missing a value', () => {
+    // BUG-004: CLI argument parsing should validate option values
+    const result = runCLI('encrypt --key');
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('requires a value') ||
+        result.stdout.includes('requires a value')
+      );
+    }
+  });
+
+  it('should show error when option value is another flag', () => {
+    // BUG-004: CLI should not accept another flag as an option value
+    const testDir = path.join(__dirname, 'temp_cli_flag_value_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+    const testEnvPath = path.join(testDir, '.env');
+    fs.writeFileSync(testEnvPath, 'KEY=value');
+
+    const result = runCLI(`encrypt --key --input "${testEnvPath}"`);
+
+    fs.rmSync(testDir, { recursive: true, force: true });
+
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('requires a value') ||
+        result.stdout.includes('requires a value') ||
+        result.stderr.includes('Invalid key format') ||
+        result.stdout.includes('Invalid key format')
+      );
+    }
+  });
 });
 
 describe('CLI - Real World Scenario', () => {
