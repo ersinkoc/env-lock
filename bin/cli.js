@@ -309,7 +309,7 @@ function main() {
       break;
 
     default:
-      error(`Unknown command: ${command}\n`);
+      print(`✗ Error: Unknown command: ${command}\n`, 'red');
       showHelp();
       process.exit(1);
   }

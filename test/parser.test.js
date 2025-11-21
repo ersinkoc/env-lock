@@ -190,6 +190,14 @@ describe('parser.js - Multiline Values', () => {
     assert.ok(result.KEY.includes('line 1'));
     assert.ok(result.KEY.includes('line 2'));
   });
+
+  it('should handle trailing whitespace after closing quote on multiline values', () => {
+    // BUG-002: Parser incorrectly removed trailing whitespace char instead of closing quote
+    const content = 'KEY="first line\nsecond line"   \nOTHER=value';
+    const result = parser.parse(content);
+    assert.strictEqual(result.KEY, 'first line\nsecond line');
+    assert.strictEqual(result.OTHER, 'value');
+  });
 });
 
 describe('parser.js - Edge Cases', () => {

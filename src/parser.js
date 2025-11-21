@@ -89,13 +89,15 @@ function parse(content) {
 
           while (i < lines.length) {
             const nextLine = lines[i];
-            multilineValue += '\n' + nextLine;
+            const trimmedNextLine = nextLine.trimEnd();
 
-            if (nextLine.trim().endsWith('"')) {
-              // Remove closing quote
-              multilineValue = multilineValue.substring(0, multilineValue.length - 1);
+            if (trimmedNextLine.endsWith('"')) {
+              // Add line without trailing whitespace, then remove closing quote
+              multilineValue += '\n' + trimmedNextLine.substring(0, trimmedNextLine.length - 1);
               break;
             }
+
+            multilineValue += '\n' + nextLine;
             i++;
           }
 
