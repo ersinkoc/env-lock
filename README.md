@@ -251,6 +251,13 @@ const content = stringify(obj);
 console.log(content); // KEY=value\nOTHER_KEY=other value
 ```
 
+> **⚠️ Important:** Unquoted values are truncated at the first `#` character (inline comment support). Values containing `#` (like color codes or URLs with fragments) must be quoted:
+> ```
+> COLOR=#ff0000          # ❌ Truncated to empty string
+> COLOR="#ff0000"        # ✅ Preserved as #ff0000
+> URL="https://ex.com#" # ✅ Quotes preserve # character
+> ```
+
 ## How It Works
 
 ### Encryption Process

@@ -317,6 +317,35 @@ describe('crypto.js - Encrypt/Decrypt Round Trip', () => {
   });
 });
 
+describe('crypto.js - Input Size Validation', () => {
+  const validKey = crypto.generateKey();
+
+  it('should reject encryption input larger than 10MB', () => {
+    // Create a string larger than 10MB (10 * 1024 * 1024 bytes)
+    const largeInput = 'a'.repeat(10 * 1024 * 1024 + 1);
+    assert.throws(
+      () => crypto.encrypt(largeInput, validKey),
+      /Input too large/
+    );
+  });
+
+  it('should successfully encrypt input exactly at 10MB limit', () => {
+    // Create a string exactly 10MB
+    const maxInput = 'a'.repeat(10 * 1024 * 1024);
+    const encrypted = crypto.encrypt(maxInput, validKey);
+    assert.ok(encrypted);
+    assert.strictEqual(typeof encrypted, 'string');
+  });
+
+  it('should successfully encrypt small input', () => {
+    const smallInput = 'small text';
+    const encrypted = crypto.encrypt(smallInput, validKey);
+    assert.ok(encrypted);
+    const decrypted = crypto.decrypt(encrypted, validKey);
+    assert.strictEqual(decrypted, smallInput);
+  });
+});
+
 describe('crypto.js - Constants', () => {
   it('should export correct algorithm', () => {
     assert.strictEqual(crypto.ALGORITHM, 'aes-256-gcm');

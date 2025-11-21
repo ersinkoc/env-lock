@@ -401,6 +401,22 @@ const parsed = parse(content)
 - ✅ Empty values (`KEY=`)
 - ✅ Whitespace trimming
 
+#### ⚠️ Important: Inline Comment Behavior
+
+**Unquoted values** are truncated at the first `#` character for inline comment support:
+```javascript
+// Truncated at #
+KEY=value # comment  →  "value"
+
+// To preserve # in values, use quotes:
+COLOR="#ff0000"      →  "#ff0000"
+URL="https://example.com#section"  →  "https://example.com#section"
+```
+
+**Quoted values** preserve `#` characters literally:
+- Single quotes: `KEY='value # comment'`  →  `"value # comment"`
+- Double quotes: `KEY="value # comment"`  →  `"value # comment"`
+
 #### Examples
 
 ```javascript
