@@ -84,7 +84,8 @@ function parse(content) {
           value = unescapeValue(value);
         } else {
           // Multi-line value: collect lines until we find closing quote
-          let multilineValue = value.substring(1); // Remove opening quote
+          // Use array to avoid O(n²) string concatenation
+          const multilineLines = [value.substring(1)]; // Remove opening quote
           i++;
           let foundClosingQuote = false;
 
@@ -94,22 +95,21 @@ function parse(content) {
 
             if (trimmedNextLine.endsWith('"')) {
               // Add line without trailing whitespace, then remove closing quote
-              multilineValue += '\n' + trimmedNextLine.substring(0, trimmedNextLine.length - 1);
+              multilineLines.push(trimmedNextLine.substring(0, trimmedNextLine.length - 1));
               foundClosingQuote = true;
               break;
             }
 
-            multilineValue += '\n' + nextLine;
+            multilineLines.push(nextLine);
             i++;
           }
 
-          // If no closing quote found, treat EOF as implicit closing quote
-          // This prevents unclosed quotes from consuming all remaining key-value pairs
-          if (!foundClosingQuote && typeof console !== 'undefined' && console.warn) {
-            console.warn(`[env-lock parser] Warning: Unclosed double quote for key "${key}" at end of file`);
+          // If no closing quote found, throw an error instead of silently continuing
+          if (!foundClosingQuote) {
+            throw new Error(`Unclosed double quote for key "${key}" at end of file`);
           }
 
-          value = unescapeValue(multilineValue);
+          value = unescapeValue(multilineLines.join('\n'));
         }
       }
       // Unquoted value - take everything up to first # (inline comment)

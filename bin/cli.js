@@ -18,6 +18,39 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { encrypt, decrypt, generateKey } = require('../src/crypto');
 
+/**
+ * Validates file path to prevent path traversal attacks
+ * @param {string} filePath - File path to validate
+ * @returns {string} Validated absolute path
+ * @throws {Error} If path is invalid or attempts traversal
+ */
+function validateFilePath(filePath) {
+  // Normalize the path to resolve any . or .. segments
+  const normalizedPath = path.normalize(filePath);
+
+  // Reject paths that escape current directory using ..
+  // This checks if the normalized path tries to go up beyond current directory
+  if (normalizedPath.startsWith('..') || normalizedPath.includes(path.sep + '..')) {
+    throw new Error('Path traversal detected: paths containing ".." are not allowed');
+  }
+
+  // Resolve to absolute path
+  const resolvedPath = path.resolve(process.cwd(), normalizedPath);
+
+  // Ensure resolved path is within or equal to current working directory
+  const cwd = process.cwd() + path.sep;
+  const resolvedWithSep = resolvedPath + path.sep;
+  if (!resolvedWithSep.startsWith(cwd) && resolvedPath !== process.cwd()) {
+    throw new Error(`Path must be within current directory: ${process.cwd()}`);
+  }
+
+  return resolvedPath;
+}
+
+// Constants
+const SEPARATOR_LENGTH = 70;
+const KEY_FORMAT_REGEX = /^[0-9a-fA-F]{64}$/;
+
 // ANSI color codes for better CLI output
 const colors = {
   reset: '\x1b[0m',
@@ -29,6 +62,17 @@ const colors = {
   blue: '\x1b[34m',
   cyan: '\x1b[36m',
 };
+
+/**
+ * Validates encryption key format
+ * @param {string} key - Key to validate
+ * @throws {Error} If key format is invalid
+ */
+function validateKeyFormat(key) {
+  if (!KEY_FORMAT_REGEX.test(key)) {
+    throw new Error('Invalid key format. Key must be 64 hexadecimal characters (32 bytes)');
+  }
+}
 
 /**
  * Prints colored output to console
@@ -149,6 +193,9 @@ function parseArgs(args) {
         error('Option --output requires a value');
       }
       result.options.output = args[i];
+    } else if (arg.startsWith('-')) {
+      // Unknown option
+      error(`Unknown option: ${arg}\nRun 'env-lock help' for usage information`);
     }
   }
 
@@ -159,8 +206,14 @@ function parseArgs(args) {
  * Encrypts .env file to .env.lock
  */
 function commandEncrypt(options) {
-  const inputPath = path.resolve(process.cwd(), options.input || '.env');
-  const outputPath = path.resolve(process.cwd(), options.output || '.env.lock');
+  // Validate paths to prevent path traversal attacks
+  let inputPath, outputPath;
+  try {
+    inputPath = validateFilePath(options.input || '.env');
+    outputPath = validateFilePath(options.output || '.env.lock');
+  } catch (err) {
+    error(err.message);
+  }
 
   // Check if input file exists
   if (!fs.existsSync(inputPath)) {
@@ -190,8 +243,10 @@ function commandEncrypt(options) {
   }
 
   // Validate key format
-  if (!/^[0-9a-fA-F]{64}$/.test(key)) {
-    error('Invalid key format. Key must be 64 hexadecimal characters (32 bytes)');
+  try {
+    validateKeyFormat(key);
+  } catch (err) {
+    error(err.message);
   }
 
   // Encrypt content
@@ -213,15 +268,15 @@ function commandEncrypt(options) {
   success(`Encrypted ${inputPath} → ${outputPath}`);
 
   if (isNewKey) {
-    print('\n' + '='.repeat(70), 'dim');
+    print('\n' + '='.repeat(SEPARATOR_LENGTH), 'dim');
     print('IMPORTANT: Save this encryption key securely!', 'yellow');
-    print('='.repeat(70), 'dim');
+    print('='.repeat(SEPARATOR_LENGTH), 'dim');
     print(`\nOXOG_ENV_KEY=${key}\n`, 'bright');
-    print('='.repeat(70), 'dim');
+    print('='.repeat(SEPARATOR_LENGTH), 'dim');
     warn('You will need this key to decrypt the .env.lock file.');
     warn('Store it in a secure location (e.g., password manager, CI/CD secrets).');
     warn('Without this key, the encrypted data cannot be recovered!');
-    print('='.repeat(70) + '\n', 'dim');
+    print('='.repeat(SEPARATOR_LENGTH) + '\n', 'dim');
   }
 }
 
@@ -229,7 +284,13 @@ function commandEncrypt(options) {
  * Decrypts .env.lock file and prints to stdout
  */
 function commandDecrypt(options) {
-  const inputPath = path.resolve(process.cwd(), options.input || '.env.lock');
+  // Validate path to prevent path traversal attacks
+  let inputPath;
+  try {
+    inputPath = validateFilePath(options.input || '.env.lock');
+  } catch (err) {
+    error(err.message);
+  }
 
   // Check if input file exists
   if (!fs.existsSync(inputPath)) {
@@ -244,8 +305,10 @@ function commandDecrypt(options) {
   }
 
   // Validate key format
-  if (!/^[0-9a-fA-F]{64}$/.test(key)) {
-    error('Invalid key format. Key must be 64 hexadecimal characters (32 bytes)');
+  try {
+    validateKeyFormat(key);
+  } catch (err) {
+    error(err.message);
   }
 
   // Read encrypted file
