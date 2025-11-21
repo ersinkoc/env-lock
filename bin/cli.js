@@ -132,11 +132,23 @@ function parseArgs(args) {
     const arg = args[i];
 
     if (arg === '--key' || arg === '-k') {
-      result.options.key = args[++i];
+      i++;
+      if (i >= args.length || args[i].startsWith('-')) {
+        error('Option --key requires a value');
+      }
+      result.options.key = args[i];
     } else if (arg === '--input' || arg === '-i') {
-      result.options.input = args[++i];
+      i++;
+      if (i >= args.length || args[i].startsWith('-')) {
+        error('Option --input requires a value');
+      }
+      result.options.input = args[i];
     } else if (arg === '--output' || arg === '-o') {
-      result.options.output = args[++i];
+      i++;
+      if (i >= args.length || args[i].startsWith('-')) {
+        error('Option --output requires a value');
+      }
+      result.options.output = args[i];
     }
   }
 
