@@ -199,20 +199,14 @@ describe('parser.js - Multiline Values', () => {
     assert.strictEqual(result.OTHER, 'value');
   });
 
-  it('should warn about unclosed double quotes at EOF', () => {
-    // BUG-003: Unclosed quotes consume entire file
-    const warnings = [];
-    const originalWarn = console.warn;
-    console.warn = (msg) => warnings.push(msg);
-
+  it('should throw error for unclosed double quotes at EOF', () => {
+    // BUG-003: Unclosed quotes now throw error instead of consuming entire file
     const content = 'KEY="unclosed value\nmore lines';
-    const result = parser.parse(content);
 
-    console.warn = originalWarn;
-
-    assert.strictEqual(result.KEY, 'unclosed value\nmore lines');
-    assert.strictEqual(warnings.length, 1);
-    assert.ok(warnings[0].includes('Unclosed double quote'));
+    assert.throws(
+      () => parser.parse(content),
+      /Unclosed double quote for key "KEY"/
+    );
   });
 });
 

@@ -185,7 +185,7 @@ describe('crypto.js - Decryption', () => {
     const wrongKey = crypto.generateKey();
     assert.throws(
       () => crypto.decrypt(encrypted, wrongKey),
-      /Decryption failed: Invalid key or tampered data/
+      /Decryption failed: Invalid or corrupted data/
     );
   });
 
@@ -222,14 +222,14 @@ describe('crypto.js - Decryption', () => {
   it('should throw error for invalid format (missing parts)', () => {
     assert.throws(
       () => crypto.decrypt('invalid:format', validKey),
-      /Invalid cipher text format/
+      /Decryption failed: Invalid or corrupted data/
     );
   });
 
   it('should throw error for invalid format (too many parts)', () => {
     assert.throws(
       () => crypto.decrypt('a:b:c:d:e', validKey),
-      /Invalid cipher text format/
+      /Decryption failed: Invalid or corrupted data/
     );
   });
 
@@ -274,7 +274,7 @@ describe('crypto.js - Decryption', () => {
     const invalid = parts.join(':');
     assert.throws(
       () => crypto.decrypt(invalid, validKey),
-      /Invalid IV length/
+      /Decryption failed: Invalid or corrupted data/
     );
   });
 
