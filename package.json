@@ -1,7 +1,7 @@
 {
   "name": "@oxog/env-lock",
-  "version": "1.0.0",
-  "description": "Zero-dependency tool to encrypt .env files into secure .env.lock files using AES-256-GCM encryption",
+  "version": "1.1.0",
+  "description": "Zero-dependency tool to encrypt .env files into secure .env.lock files using AES-256-GCM encryption with enterprise-grade security",
   "main": "src/index.js",
   "bin": {
     "env-lock": "bin/cli.js"
@@ -18,7 +18,13 @@
     "aes-256-gcm",
     "environment",
     "config",
-    "zero-dependency"
+    "zero-dependency",
+    "secure",
+    "async",
+    "rate-limiting",
+    "production-ready",
+    "enterprise",
+    "hardened"
   ],
   "author": "Ersin Koc",
   "license": "MIT",
