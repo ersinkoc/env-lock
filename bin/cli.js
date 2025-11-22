@@ -238,7 +238,9 @@ function commandEncrypt(options) {
   try {
     content = fs.readFileSync(inputPath, 'utf8');
   } catch (err) {
-    error(`Failed to read input file: ${err.message}`);
+    // Sanitize error message to prevent information disclosure
+    const errorCode = err.code || 'UNKNOWN';
+    error(`Failed to read input file (${errorCode}). Check file permissions.`);
   }
 
   if (!content.trim()) {
@@ -274,7 +276,9 @@ function commandEncrypt(options) {
   try {
     fs.writeFileSync(outputPath, encrypted, 'utf8');
   } catch (err) {
-    error(`Failed to write output file: ${err.message}`);
+    // Sanitize error message to prevent information disclosure
+    const errorCode = err.code || 'UNKNOWN';
+    error(`Failed to write output file (${errorCode}). Check file permissions and disk space.`);
   }
 
   // Print success message
@@ -325,7 +329,9 @@ function commandDecrypt(options) {
   try {
     encryptedContent = fs.readFileSync(inputPath, 'utf8').trim();
   } catch (err) {
-    error(`Failed to read input file: ${err.message}`);
+    // Sanitize error message to prevent information disclosure
+    const errorCode = err.code || 'UNKNOWN';
+    error(`Failed to read input file (${errorCode}). Check file permissions.`);
   }
 
   if (!encryptedContent) {
