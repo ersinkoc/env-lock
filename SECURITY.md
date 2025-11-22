@@ -103,12 +103,32 @@ Our current implementation includes multiple layers of security:
 
 ## 🔍 Known Security Considerations
 
+### ⚠️ Important Limitations
+
+**Rate Limiting in Distributed Deployments:**
+
+The built-in rate limiting (10 failed attempts per minute) uses in-process memory and **does not scale across multiple processes or worker threads**. This is a known architectural limitation:
+
+- **Single Process:** ✅ Rate limiting works correctly
+- **Cluster Mode (multiple workers):** ⚠️ Rate limits apply per-process, not globally
+- **Horizontal Scaling (multiple servers):** ⚠️ Rate limits apply per-server, not globally
+
+**Impact:** In distributed deployments, an attacker can bypass rate limits by distributing requests across multiple workers or servers.
+
+**Mitigation Strategies:**
+1. **External Rate Limiting:** Use a Web Application Firewall (WAF) or API Gateway with distributed rate limiting (e.g., AWS WAF, Cloudflare, nginx)
+2. **Single Process Mode:** For sensitive applications, run in single-process mode
+3. **Monitoring:** Implement monitoring to detect distributed brute-force attempts
+4. **Strong Keys:** Use full 256-bit random keys (never weak or predictable keys)
+
+**Roadmap:** v2.0 will include pluggable rate limiter backends (Redis, Memcached) for distributed deployments.
+
 ### Out of Scope
 
 The following are **NOT** security vulnerabilities:
 
 1. **Key Management:** We don't manage encryption keys - users must secure `OXOG_ENV_KEY`
-2. **Memory Dumps:** JavaScript limitations prevent complete memory protection
+2. **Memory Dumps:** JavaScript limitations prevent complete memory protection (best-effort clearing only)
 3. **Physical Access:** Cannot protect against attackers with physical machine access
 4. **Social Engineering:** Cannot prevent users from sharing keys insecurely
 5. **Compromised Dependencies:** Zero external dependencies, but Node.js itself could be compromised

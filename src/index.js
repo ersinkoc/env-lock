@@ -21,8 +21,15 @@ const DANGEROUS_KEYS = new Set([
   'NODE_OPTIONS',
   'NODE_PATH',
   'NODE_DEBUG',
-  'NODE_REPL_HISTORY'
+  'NODE_REPL_HISTORY',
+  'eval',
+  'require',
+  'module',
+  'exports'
 ]);
+
+// Maximum allowed length for environment variable keys (prevent DoS)
+const MAX_ENV_KEY_LENGTH = 256;
 
 /**
  * Validates environment variable key name
@@ -30,6 +37,11 @@ const DANGEROUS_KEYS = new Set([
  * @returns {boolean} True if key is valid
  */
 function isValidEnvKey(key) {
+  // Check key length first (prevent DoS via extremely long keys)
+  if (!key || typeof key !== 'string' || key.length === 0 || key.length > MAX_ENV_KEY_LENGTH) {
+    return false;
+  }
+
   // Check if key is dangerous
   if (DANGEROUS_KEYS.has(key)) {
     return false;

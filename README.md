@@ -22,15 +22,17 @@ Safely commit encrypted environment variables to version control while keeping s
 
 ### 🔒 Security Features (v1.1.0+)
 - **⚡ Async Operations**: Non-blocking I/O for production servers
-- **🛡️ Rate Limiting**: Prevents brute force attacks (10 attempts/min)
+- **🛡️ Rate Limiting**: Prevents brute force attacks (10 attempts/min)*
 - **🚫 Input Validation**: 10MB size limits prevent DoS attacks
-- **🔐 Memory Security**: Automatic buffer cleanup after crypto operations
-- **🛑 Path Protection**: Prevents directory traversal attacks in CLI
-- **🔑 Key Validation**: Blocks dangerous environment variable names
+- **🔐 Memory Security**: Best-effort buffer cleanup after crypto operations
+- **🛑 Path Protection**: Prevents directory traversal and symlink attacks in CLI
+- **🔑 Key Validation**: Blocks dangerous environment variable names (max 256 chars)
 - **⏱️ Timing Attack Prevention**: Constant-time error responses
 - **🏃 Race Condition Fixes**: Atomic file operations (TOCTOU prevention)
 
-**Security Posture:** 9.0/10 - Production ready ✅
+**Security Posture:** 8.5/10 - Production ready for single-process deployments ✅
+
+> **⚠️ Important:** Rate limiting is per-process only. For distributed deployments (cluster mode, multiple servers), use external rate limiting (WAF, API Gateway). See [SECURITY.md](./SECURITY.md) for details.
 
 ## Installation
 

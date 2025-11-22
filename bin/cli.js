@@ -21,10 +21,11 @@ const { encrypt, decrypt, generateKey } = require('../src/crypto');
 /**
  * Validates file path to prevent path traversal attacks
  * @param {string} filePath - File path to validate
+ * @param {boolean} mustExist - If true, path must exist (for symlink resolution)
  * @returns {string} Validated absolute path
  * @throws {Error} If path is invalid or attempts traversal
  */
-function validateFilePath(filePath) {
+function validateFilePath(filePath, mustExist = false) {
   // Normalize the path to resolve any . or .. segments
   const normalizedPath = path.normalize(filePath);
 
@@ -35,12 +36,28 @@ function validateFilePath(filePath) {
   }
 
   // Resolve to absolute path
-  const resolvedPath = path.resolve(process.cwd(), normalizedPath);
+  let resolvedPath = path.resolve(process.cwd(), normalizedPath);
+
+  // If file must exist, resolve symlinks to get real path
+  // This prevents symlink-based directory traversal attacks
+  if (mustExist) {
+    try {
+      resolvedPath = fs.realpathSync(resolvedPath);
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        throw new Error(`File not found: ${filePath}`);
+      }
+      throw err;
+    }
+  }
+
+  // Get real path of current working directory to handle symlinks in cwd itself
+  const realCwd = fs.realpathSync(process.cwd());
+  const cwdWithSep = realCwd + path.sep;
+  const resolvedWithSep = resolvedPath + path.sep;
 
   // Ensure resolved path is within or equal to current working directory
-  const cwd = process.cwd() + path.sep;
-  const resolvedWithSep = resolvedPath + path.sep;
-  if (!resolvedWithSep.startsWith(cwd) && resolvedPath !== process.cwd()) {
+  if (!resolvedWithSep.startsWith(cwdWithSep) && resolvedPath !== realCwd) {
     throw new Error(`Path must be within current directory: ${process.cwd()}`);
   }
 
@@ -207,17 +224,13 @@ function parseArgs(args) {
  */
 function commandEncrypt(options) {
   // Validate paths to prevent path traversal attacks
+  // Input must exist (for symlink resolution), output doesn't need to exist yet
   let inputPath, outputPath;
   try {
-    inputPath = validateFilePath(options.input || '.env');
-    outputPath = validateFilePath(options.output || '.env.lock');
+    inputPath = validateFilePath(options.input || '.env', true);  // mustExist=true
+    outputPath = validateFilePath(options.output || '.env.lock', false);  // mustExist=false
   } catch (err) {
     error(err.message);
-  }
-
-  // Check if input file exists
-  if (!fs.existsSync(inputPath)) {
-    error(`Input file not found: ${inputPath}`);
   }
 
   // Read input file
@@ -285,16 +298,12 @@ function commandEncrypt(options) {
  */
 function commandDecrypt(options) {
   // Validate path to prevent path traversal attacks
+  // Input must exist (for symlink resolution)
   let inputPath;
   try {
-    inputPath = validateFilePath(options.input || '.env.lock');
+    inputPath = validateFilePath(options.input || '.env.lock', true);  // mustExist=true
   } catch (err) {
     error(err.message);
-  }
-
-  // Check if input file exists
-  if (!fs.existsSync(inputPath)) {
-    error(`Input file not found: ${inputPath}`);
   }
 
   // Get decryption key

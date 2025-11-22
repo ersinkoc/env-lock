@@ -10,6 +10,21 @@
 
 const crypto = require('node:crypto');
 
+/**
+ * Forces V8 to retain buffer in memory after zeroing
+ * Prevents dead store elimination optimization
+ * @param {Buffer} buffer - Buffer to verify
+ */
+function volatileRead(buffer) {
+  // Volatile read to prevent optimization
+  // This forces V8 to keep the buffer and not optimize away the fill(0)
+  if (buffer && buffer.length > 0) {
+    // Use timing-safe comparison to force buffer retention
+    const zero = Buffer.alloc(1, 0);
+    crypto.timingSafeEqual(buffer.subarray(0, 1), zero);
+  }
+}
+
 // Constants
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 12 bytes (96 bits) for GCM mode
@@ -148,13 +163,17 @@ function encrypt(text, keyHex) {
 
     // Clear sensitive data from memory
     keyBuffer.fill(0);
+    volatileRead(keyBuffer);  // Prevent optimization
     iv.fill(0);
+    volatileRead(iv);  // Prevent optimization
     authTag.fill(0);
+    volatileRead(authTag);  // Prevent optimization
 
     return result;
   } catch (error) {
     // Clear sensitive data even on error
     keyBuffer.fill(0);
+    volatileRead(keyBuffer);  // Prevent optimization
     throw new Error(`Encryption failed: ${error.message}`);
   }
 }
@@ -234,17 +253,33 @@ function decrypt(cipherText, keyHex) {
 
     // Clear sensitive data from memory
     keyBuffer.fill(0);
+    volatileRead(keyBuffer);  // Prevent optimization
     iv.fill(0);
+    volatileRead(iv);  // Prevent optimization
     authTag.fill(0);
+    volatileRead(authTag);  // Prevent optimization
     encryptedData.fill(0);
+    volatileRead(encryptedData);  // Prevent optimization
 
     return decrypted;
   } catch (error) {
     // Clear sensitive data even on error
-    if (keyBuffer) keyBuffer.fill(0);
-    if (iv) iv.fill(0);
-    if (authTag) authTag.fill(0);
-    if (encryptedData) encryptedData.fill(0);
+    if (keyBuffer) {
+      keyBuffer.fill(0);
+      volatileRead(keyBuffer);  // Prevent optimization
+    }
+    if (iv) {
+      iv.fill(0);
+      volatileRead(iv);  // Prevent optimization
+    }
+    if (authTag) {
+      authTag.fill(0);
+      volatileRead(authTag);  // Prevent optimization
+    }
+    if (encryptedData) {
+      encryptedData.fill(0);
+      volatileRead(encryptedData);  // Prevent optimization
+    }
 
     // Record failed attempt for rate limiting
     recordFailedAttempt(keyHex);
