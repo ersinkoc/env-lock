@@ -236,21 +236,21 @@ describe('crypto.js - Decryption', () => {
   it('should throw error for empty cipher text', () => {
     assert.throws(
       () => crypto.decrypt('', validKey),
-      /Cipher text cannot be empty/
+      /Cipher text must be a non-empty string/
     );
   });
 
   it('should throw error for null cipher text', () => {
     assert.throws(
       () => crypto.decrypt(null, validKey),
-      /Cipher text must be a string/
+      /Cipher text must be a non-empty string/
     );
   });
 
   it('should throw error for undefined cipher text', () => {
     assert.throws(
       () => crypto.decrypt(undefined, validKey),
-      /Cipher text must be a string/
+      /Cipher text must be a non-empty string/
     );
   });
 

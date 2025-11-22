@@ -745,3 +745,147 @@ describe('index.js - File System Error Coverage', () => {
     assert.deepStrictEqual(result, {});
   });
 });
+
+describe('index.js - Edge Cases and Advanced Scenarios', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+
+  beforeEach(() => {
+    // Fresh require for each test
+    delete require.cache[require.resolve('../src/index.js')];
+    envLock = require('../src/index.js');
+
+    // Save original environment
+    originalEnv = { ...process.env };
+
+    // Create temporary test directory
+    testDir = path.join(__dirname, `test-edge-cases-${Date.now()}`);
+    fs.mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    // Restore environment
+    process.env = originalEnv;
+
+    // Clean up test directory
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should handle symbolic links to .env.lock files', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    // Create actual .env.lock file
+    const actualFile = path.join(testDir, 'actual.env.lock');
+    const content = 'TEST_VAR=symlink_value';
+    const encrypted = crypto.encrypt(content, key);
+    fs.writeFileSync(actualFile, encrypted);
+
+    // Create symbolic link
+    const symlinkPath = path.join(testDir, '.env.lock');
+    try {
+      fs.symlinkSync(actualFile, symlinkPath);
+    } catch (err) {
+      // Symbolic link creation may fail on some systems (e.g., Windows without admin)
+      // Skip this test if symlinks are not supported
+      if (err.code === 'EPERM' || err.code === 'ENOSYS') {
+        return;
+      }
+      throw err;
+    }
+
+    // Load via symbolic link
+    const result = envLock.config({
+      path: symlinkPath,
+      silent: true
+    });
+
+    assert.strictEqual(result.TEST_VAR, 'symlink_value');
+  });
+
+  it('should handle very long environment variable values', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    // Create a very long value (1MB)
+    const longValue = 'x'.repeat(1024 * 1024);
+    const content = `LONG_VAR=${longValue}`;
+    const encrypted = crypto.encrypt(content, key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    const result = envLock.config({
+      path: filePath,
+      silent: true
+    });
+
+    assert.strictEqual(result.LONG_VAR, longValue);
+    assert.strictEqual(result.LONG_VAR.length, 1024 * 1024);
+  });
+
+  it('should handle files with UTF-8 BOM', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const content = 'UTF8_VAR=value';
+    const encrypted = crypto.encrypt(content, key);
+
+    // Add UTF-8 BOM to the beginning
+    const bom = '\uFEFF';
+    const withBom = bom + encrypted;
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, withBom);
+
+    const result = envLock.config({
+      path: filePath,
+      silent: true
+    });
+
+    // Should handle BOM gracefully
+    assert.ok(result);
+  });
+
+  it('should handle concurrent config() calls', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const content = 'CONCURRENT_VAR=concurrent_value';
+    const encrypted = crypto.encrypt(content, key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    // Make multiple concurrent calls
+    const result1 = envLock.config({ path: filePath, silent: true });
+    const result2 = envLock.config({ path: filePath, silent: true });
+    const result3 = envLock.config({ path: filePath, silent: true });
+
+    assert.strictEqual(result1.CONCURRENT_VAR, 'concurrent_value');
+    assert.strictEqual(result2.CONCURRENT_VAR, 'concurrent_value');
+    assert.strictEqual(result3.CONCURRENT_VAR, 'concurrent_value');
+  });
+
+  it('should handle whitespace-only .env.lock files', () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    // Encrypt whitespace-only content
+    const encrypted = crypto.encrypt('   \n\t\n   ', key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    const result = envLock.config({
+      path: filePath,
+      silent: true
+    });
+
+    // Should return empty object for whitespace-only content
+    assert.deepStrictEqual(result, {});
+  });
+});

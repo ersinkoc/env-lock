@@ -23,6 +23,22 @@ const MAX_FAILED_ATTEMPTS = 10; // Max failed attempts per window
 const failedAttempts = new Map(); // Track failed attempts by key hash
 
 /**
+ * Validates that a value is a valid non-empty string
+ * @param {*} value - Value to validate
+ * @param {boolean} allowEmpty - Whether to allow empty strings (default: false)
+ * @returns {boolean} True if valid string
+ */
+function isValidString(value, allowEmpty = false) {
+  if (value === null || value === undefined || typeof value !== 'string') {
+    return false;
+  }
+  if (!allowEmpty && value.length === 0) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Clears rate limit tracking for a key
  * @param {string} keyHash - Hash of the key
  */
@@ -91,8 +107,8 @@ function generateKey() {
  * @throws {Error} If key length is invalid or encryption fails
  */
 function encrypt(text, keyHex) {
-  // Validate input
-  if (text === undefined || text === null || typeof text !== 'string') {
+  // Validate input - allow empty strings for text
+  if (!isValidString(text, true)) {
     throw new Error('Text to encrypt must be a string');
   }
 
@@ -102,7 +118,7 @@ function encrypt(text, keyHex) {
     throw new Error(`Input too large: maximum size is ${MAX_INPUT_SIZE} bytes (${(MAX_INPUT_SIZE / 1024 / 1024).toFixed(1)}MB), got ${textSize} bytes`);
   }
 
-  if (!keyHex || typeof keyHex !== 'string') {
+  if (!isValidString(keyHex)) {
     throw new Error('Encryption key must be a non-empty string');
   }
 
@@ -152,13 +168,9 @@ function encrypt(text, keyHex) {
  * @throws {Error} If decryption fails (wrong key, tampered data, or invalid format)
  */
 function decrypt(cipherText, keyHex) {
-  // Validate input
-  if (cipherText === undefined || cipherText === null || typeof cipherText !== 'string') {
-    throw new Error('Cipher text must be a string');
-  }
-
-  if (!cipherText) {
-    throw new Error('Cipher text cannot be empty');
+  // Validate input - cipher text cannot be empty
+  if (!isValidString(cipherText)) {
+    throw new Error('Cipher text must be a non-empty string');
   }
 
   // Validate input size to prevent DoS
@@ -167,7 +179,7 @@ function decrypt(cipherText, keyHex) {
     throw new Error(`Input too large: maximum size is ${MAX_INPUT_SIZE * 2} bytes, got ${cipherSize} bytes`);
   }
 
-  if (!keyHex || typeof keyHex !== 'string') {
+  if (!isValidString(keyHex)) {
     throw new Error('Decryption key must be a non-empty string');
   }
 
