@@ -6,14 +6,22 @@ Complete API documentation for `@oxog/env-lock`.
 
 - [Runtime API](#runtime-api)
   - [config()](#config)
+  - [configAsync()](#configasync) ⭐ New
   - [load()](#load)
+  - [loadAsync()](#loadasync) ⭐ New
 - [Encryption API](#encryption-api)
   - [generateKey()](#generatekey)
   - [encrypt()](#encrypt)
   - [decrypt()](#decrypt)
+  - [clearRateLimit()](#clearratelimit) ⭐ New
 - [Parser API](#parser-api)
   - [parse()](#parse)
   - [stringify()](#stringify)
+- [Security Features](#security-features) 🔒 New
+  - [Input Validation](#input-validation)
+  - [Rate Limiting](#rate-limiting)
+  - [Memory Security](#memory-security)
+  - [Path Security](#path-security)
 - [Constants](#constants)
 - [CLI Commands](#cli-commands)
   - [encrypt](#cli-encrypt)
@@ -98,6 +106,73 @@ Errors are logged to console unless `silent: true`.
 
 ---
 
+### configAsync()
+
+⭐ **New in v1.1.0** - Asynchronous version of `config()` for non-blocking I/O operations.
+
+#### Syntax
+
+```javascript
+const result = await configAsync([options])
+```
+
+#### Parameters
+
+Same as [`config()`](#config).
+
+#### Returns
+
+- **Promise\<Object\>**: Promise resolving to parsed environment variables
+
+#### Behavior
+
+Identical to `config()` but uses asynchronous file I/O operations, making it suitable for:
+- Production web servers
+- High-concurrency applications
+- Event-driven architectures
+
+#### Examples
+
+```javascript
+const envLock = require('@oxog/env-lock');
+
+// Basic async usage
+async function loadConfig() {
+  const vars = await envLock.configAsync();
+  console.log('Loaded:', Object.keys(vars));
+}
+
+// In Express.js
+app.use(async (req, res, next) => {
+  await envLock.configAsync({ silent: true });
+  next();
+});
+
+// With error handling
+try {
+  const vars = await envLock.configAsync({
+    path: '.env.production.lock',
+    override: true
+  });
+  console.log('Config loaded successfully');
+} catch (error) {
+  console.error('Failed to load config:', error);
+}
+```
+
+#### Performance
+
+**Synchronous (config):**
+- Blocks event loop during file I/O
+- Suitable for CLI tools and startup scripts
+
+**Asynchronous (configAsync):**
+- Non-blocking I/O
+- Recommended for production servers
+- Enables concurrent request handling
+
+---
+
 ### load()
 
 Alias for [`config()`](#config). Provided for compatibility.
@@ -109,6 +184,20 @@ const result = load([options])
 ```
 
 See [`config()`](#config) for details.
+
+---
+
+### loadAsync()
+
+⭐ **New in v1.1.0** - Asynchronous version of `load()`.
+
+#### Syntax
+
+```javascript
+const result = await loadAsync([options])
+```
+
+Alias for [`configAsync()`](#configasync). See above for details.
 
 ---
 
@@ -311,6 +400,22 @@ const parsed = parse(content)
 - ✅ Inline comments (`KEY=value # comment`)
 - ✅ Empty values (`KEY=`)
 - ✅ Whitespace trimming
+
+#### ⚠️ Important: Inline Comment Behavior
+
+**Unquoted values** are truncated at the first `#` character for inline comment support:
+```javascript
+// Truncated at #
+KEY=value # comment  →  "value"
+
+// To preserve # in values, use quotes:
+COLOR="#ff0000"      →  "#ff0000"
+URL="https://example.com#section"  →  "https://example.com#section"
+```
+
+**Quoted values** preserve `#` characters literally:
+- Single quotes: `KEY='value # comment'`  →  `"value # comment"`
+- Double quotes: `KEY="value # comment"`  →  `"value # comment"`
 
 #### Examples
 

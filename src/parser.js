@@ -13,14 +13,24 @@
  *
  * Supports:
  * - KEY=VALUE format
- * - Comments starting with #
+ * - Comments starting with # (full line only)
  * - Single and double quoted values
  * - Empty lines
  * - Whitespace trimming
- * - Multiline values in quotes
+ * - Multiline values in double quotes
+ * - Escape sequences in double quotes (\n, \r, \t, \", \\)
+ *
+ * Inline Comment Behavior:
+ * - Unquoted values: Truncated at first # character (inline comment support)
+ *   Example: KEY=value # comment  →  value
+ *   WARNING: Values containing # must be quoted to preserve them
+ *   Example: COLOR="#ff0000"  →  #ff0000
+ * - Single quoted values: # characters are preserved literally
+ * - Double quoted values: # characters are preserved literally
  *
  * @param {string} content - The .env file content to parse
  * @returns {Object} Object containing parsed key-value pairs
+ * @throws {Error} If a double-quoted value is not closed before EOF
  */
 function parse(content) {
   if (!content || typeof content !== 'string') {

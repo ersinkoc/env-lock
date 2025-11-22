@@ -236,21 +236,21 @@ describe('crypto.js - Decryption', () => {
   it('should throw error for empty cipher text', () => {
     assert.throws(
       () => crypto.decrypt('', validKey),
-      /Cipher text cannot be empty/
+      /Cipher text must be a non-empty string/
     );
   });
 
   it('should throw error for null cipher text', () => {
     assert.throws(
       () => crypto.decrypt(null, validKey),
-      /Cipher text must be a string/
+      /Cipher text must be a non-empty string/
     );
   });
 
   it('should throw error for undefined cipher text', () => {
     assert.throws(
       () => crypto.decrypt(undefined, validKey),
-      /Cipher text must be a string/
+      /Cipher text must be a non-empty string/
     );
   });
 
@@ -314,6 +314,35 @@ describe('crypto.js - Encrypt/Decrypt Round Trip', () => {
     assert.notStrictEqual(encrypted1, encrypted2);
     assert.strictEqual(crypto.decrypt(encrypted1, key1), plaintext);
     assert.strictEqual(crypto.decrypt(encrypted2, key2), plaintext);
+  });
+});
+
+describe('crypto.js - Input Size Validation', () => {
+  const validKey = crypto.generateKey();
+
+  it('should reject encryption input larger than 10MB', () => {
+    // Create a string larger than 10MB (10 * 1024 * 1024 bytes)
+    const largeInput = 'a'.repeat(10 * 1024 * 1024 + 1);
+    assert.throws(
+      () => crypto.encrypt(largeInput, validKey),
+      /Input too large/
+    );
+  });
+
+  it('should successfully encrypt input exactly at 10MB limit', () => {
+    // Create a string exactly 10MB
+    const maxInput = 'a'.repeat(10 * 1024 * 1024);
+    const encrypted = crypto.encrypt(maxInput, validKey);
+    assert.ok(encrypted);
+    assert.strictEqual(typeof encrypted, 'string');
+  });
+
+  it('should successfully encrypt small input', () => {
+    const smallInput = 'small text';
+    const encrypted = crypto.encrypt(smallInput, validKey);
+    assert.ok(encrypted);
+    const decrypted = crypto.decrypt(encrypted, validKey);
+    assert.strictEqual(decrypted, smallInput);
   });
 });
 
