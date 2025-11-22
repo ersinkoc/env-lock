@@ -10,6 +10,21 @@
 
 const crypto = require('node:crypto');
 
+/**
+ * Forces V8 to retain buffer in memory after zeroing
+ * Prevents dead store elimination optimization
+ * @param {Buffer} buffer - Buffer to verify
+ */
+function volatileRead(buffer) {
+  // Volatile read to prevent optimization
+  // This forces V8 to keep the buffer and not optimize away the fill(0)
+  if (buffer && buffer.length > 0) {
+    // Use timing-safe comparison to force buffer retention
+    const zero = Buffer.alloc(1, 0);
+    crypto.timingSafeEqual(buffer.subarray(0, 1), zero);
+  }
+}
+
 // Constants
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12; // 12 bytes (96 bits) for GCM mode
@@ -99,11 +114,11 @@ function generateKey() {
 }
 
 /**
- * Encrypts plaintext using AES-256-GCM
+ * Encrypts plaintext using AES-256-GCM with integrity verification
  *
  * @param {string} text - The plaintext to encrypt
  * @param {string} keyHex - The 32-byte encryption key as hex string (64 characters)
- * @returns {string} Encrypted data in format: IV_HEX:AUTH_TAG_HEX:ENCRYPTED_DATA_HEX
+ * @returns {string} Encrypted data in format: v1|timestamp|checksum|IV:TAG:DATA
  * @throws {Error} If key length is invalid or encryption fails
  */
 function encrypt(text, keyHex) {
@@ -143,26 +158,36 @@ function encrypt(text, keyHex) {
     // Get authentication tag (MUST be called after final())
     const authTag = cipher.getAuthTag();
 
-    // Return format: IV:AUTH_TAG:ENCRYPTED_DATA (all in hex)
-    const result = `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+    // Create encrypted payload: IV:AUTH_TAG:ENCRYPTED_DATA (all in hex)
+    const encryptedPayload = `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+
+    // Add integrity metadata (v1 format with timestamp and checksum)
+    const timestamp = Date.now();
+    const checksum = crypto.createHash('sha256').update(encryptedPayload).digest('hex');
+    const result = `v1|${timestamp}|${checksum}|${encryptedPayload}`;
 
     // Clear sensitive data from memory
     keyBuffer.fill(0);
+    volatileRead(keyBuffer);  // Prevent optimization
     iv.fill(0);
+    volatileRead(iv);  // Prevent optimization
     authTag.fill(0);
+    volatileRead(authTag);  // Prevent optimization
 
     return result;
   } catch (error) {
     // Clear sensitive data even on error
     keyBuffer.fill(0);
+    volatileRead(keyBuffer);  // Prevent optimization
     throw new Error(`Encryption failed: ${error.message}`);
   }
 }
 
 /**
- * Decrypts ciphertext using AES-256-GCM
+ * Decrypts ciphertext using AES-256-GCM with integrity verification
+ * Supports both v1 format (with metadata) and legacy format (backward compatible)
  *
- * @param {string} cipherText - Encrypted data in format: IV_HEX:AUTH_TAG_HEX:ENCRYPTED_DATA_HEX
+ * @param {string} cipherText - Encrypted data in format v1|timestamp|checksum|IV:TAG:DATA or IV:TAG:DATA
  * @param {string} keyHex - The 32-byte decryption key as hex string (64 characters)
  * @returns {string} The decrypted plaintext
  * @throws {Error} If decryption fails (wrong key, tampered data, or invalid format)
@@ -197,10 +222,34 @@ function decrypt(cipherText, keyHex) {
 
   // Declare variables outside try block for proper cleanup in catch
   let iv, authTag, encryptedData;
+  let encryptedPayload;
 
   try {
-    // Parse the cipher text format: IV:AUTH_TAG:ENCRYPTED_DATA
-    const parts = cipherText.split(':');
+    // Detect format: v1 (with metadata) or legacy (backward compatible)
+    if (cipherText.startsWith('v1|')) {
+      // Parse v1 format: v1|timestamp|checksum|IV:TAG:DATA
+      const metaParts = cipherText.split('|');
+      if (metaParts.length !== 4) {
+        throw new Error('Decryption failed: Invalid or corrupted data');
+      }
+
+      const [version, timestamp, expectedChecksum, payload] = metaParts;
+
+      // Verify integrity checksum
+      const actualChecksum = crypto.createHash('sha256').update(payload).digest('hex');
+      if (actualChecksum !== expectedChecksum) {
+        throw new Error('Decryption failed: Invalid or corrupted data');
+      }
+
+      encryptedPayload = payload;
+      // Note: Timestamp can be used for rollback detection in application layer
+    } else {
+      // Legacy format: IV:TAG:DATA (backward compatible)
+      encryptedPayload = cipherText;
+    }
+
+    // Parse the encrypted payload format: IV:AUTH_TAG:ENCRYPTED_DATA
+    const parts = encryptedPayload.split(':');
 
     if (parts.length !== 3) {
       throw new Error('Decryption failed: Invalid or corrupted data');
@@ -234,17 +283,33 @@ function decrypt(cipherText, keyHex) {
 
     // Clear sensitive data from memory
     keyBuffer.fill(0);
+    volatileRead(keyBuffer);  // Prevent optimization
     iv.fill(0);
+    volatileRead(iv);  // Prevent optimization
     authTag.fill(0);
+    volatileRead(authTag);  // Prevent optimization
     encryptedData.fill(0);
+    volatileRead(encryptedData);  // Prevent optimization
 
     return decrypted;
   } catch (error) {
     // Clear sensitive data even on error
-    if (keyBuffer) keyBuffer.fill(0);
-    if (iv) iv.fill(0);
-    if (authTag) authTag.fill(0);
-    if (encryptedData) encryptedData.fill(0);
+    if (keyBuffer) {
+      keyBuffer.fill(0);
+      volatileRead(keyBuffer);  // Prevent optimization
+    }
+    if (iv) {
+      iv.fill(0);
+      volatileRead(iv);  // Prevent optimization
+    }
+    if (authTag) {
+      authTag.fill(0);
+      volatileRead(authTag);  // Prevent optimization
+    }
+    if (encryptedData) {
+      encryptedData.fill(0);
+      volatileRead(encryptedData);  // Prevent optimization
+    }
 
     // Record failed attempt for rate limiting
     recordFailedAttempt(keyHex);

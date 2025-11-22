@@ -21,8 +21,15 @@ const DANGEROUS_KEYS = new Set([
   'NODE_OPTIONS',
   'NODE_PATH',
   'NODE_DEBUG',
-  'NODE_REPL_HISTORY'
+  'NODE_REPL_HISTORY',
+  'eval',
+  'require',
+  'module',
+  'exports'
 ]);
+
+// Maximum allowed length for environment variable keys (prevent DoS)
+const MAX_ENV_KEY_LENGTH = 256;
 
 /**
  * Validates environment variable key name
@@ -30,6 +37,11 @@ const DANGEROUS_KEYS = new Set([
  * @returns {boolean} True if key is valid
  */
 function isValidEnvKey(key) {
+  // Check key length first (prevent DoS via extremely long keys)
+  if (!key || typeof key !== 'string' || key.length === 0 || key.length > MAX_ENV_KEY_LENGTH) {
+    return false;
+  }
+
   // Check if key is dangerous
   if (DANGEROUS_KEYS.has(key)) {
     return false;
@@ -107,7 +119,7 @@ function config(options = {}) {
           '[env-lock] Error: Failed to decrypt .env.lock. ' +
           'Please verify that OXOG_ENV_KEY is correct.'
         );
-        console.error(`[env-lock] Details: ${error.message}`);
+        // Do not expose error details to prevent information disclosure
       }
       return {};
     }
@@ -122,7 +134,8 @@ function config(options = {}) {
       // Validate key name for security
       if (!isValidEnvKey(key)) {
         if (!silent) {
-          console.warn(`[env-lock] Warning: Skipping invalid or dangerous key: ${key}`);
+          // Do not expose key name to prevent information disclosure
+          console.warn('[env-lock] Warning: Skipping invalid or dangerous environment variable key');
         }
         skippedCount++;
         continue;
@@ -149,7 +162,7 @@ function config(options = {}) {
     if (error.code === 'ENOENT') {
       if (!silent) {
         console.warn(
-          `[env-lock] Warning: .env.lock file not found at ${envLockPath}. ` +
+          '[env-lock] Warning: .env.lock file not found. ' +
           'Skipping decryption.'
         );
       }
@@ -157,7 +170,8 @@ function config(options = {}) {
     }
 
     if (!silent) {
-      console.error(`[env-lock] Error: ${error.message}`);
+      // Do not expose error details to prevent information disclosure
+      console.error('[env-lock] Error: Failed to load .env.lock file');
     }
     return {};
   }
@@ -212,7 +226,7 @@ async function configAsync(options = {}) {
           '[env-lock] Error: Failed to decrypt .env.lock. ' +
           'Please verify that OXOG_ENV_KEY is correct.'
         );
-        console.error(`[env-lock] Details: ${error.message}`);
+        // Do not expose error details to prevent information disclosure
       }
       return {};
     }
@@ -227,7 +241,8 @@ async function configAsync(options = {}) {
       // Validate key name for security
       if (!isValidEnvKey(key)) {
         if (!silent) {
-          console.warn(`[env-lock] Warning: Skipping invalid or dangerous key: ${key}`);
+          // Do not expose key name to prevent information disclosure
+          console.warn('[env-lock] Warning: Skipping invalid or dangerous environment variable key');
         }
         skippedCount++;
         continue;
@@ -254,7 +269,7 @@ async function configAsync(options = {}) {
     if (error.code === 'ENOENT') {
       if (!silent) {
         console.warn(
-          `[env-lock] Warning: .env.lock file not found at ${envLockPath}. ` +
+          '[env-lock] Warning: .env.lock file not found. ' +
           'Skipping decryption.'
         );
       }
@@ -262,7 +277,8 @@ async function configAsync(options = {}) {
     }
 
     if (!silent) {
-      console.error(`[env-lock] Error: ${error.message}`);
+      // Do not expose error details to prevent information disclosure
+      console.error('[env-lock] Error: Failed to load .env.lock file');
     }
     return {};
   }
