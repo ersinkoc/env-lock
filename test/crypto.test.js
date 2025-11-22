@@ -39,11 +39,23 @@ describe('crypto.js - Encryption', () => {
     assert.notStrictEqual(encrypted, plaintext);
   });
 
-  it('should return encrypted data in correct format (IV:TAG:DATA)', () => {
+  it('should return encrypted data in correct v1 format', () => {
     const plaintext = 'Test data';
     const encrypted = crypto.encrypt(plaintext, validKey);
-    const parts = encrypted.split(':');
-    assert.strictEqual(parts.length, 3);
+
+    // Verify v1 format: v1|timestamp|checksum|IV:TAG:DATA
+    assert.ok(encrypted.startsWith('v1|'));
+
+    const metaParts = encrypted.split('|');
+    assert.strictEqual(metaParts.length, 4);
+    assert.strictEqual(metaParts[0], 'v1');
+    assert.match(metaParts[1], /^\d+$/); // timestamp
+    assert.match(metaParts[2], /^[0-9a-f]{64}$/); // SHA-256 checksum
+
+    // Verify payload format
+    const payload = metaParts[3];
+    const parts = payload.split(':');
+    assert.strictEqual(parts.length, 3); // IV:TAG:DATA
   });
 
   it('should generate different IVs for same plaintext', () => {
@@ -285,6 +297,74 @@ describe('crypto.js - Decryption', () => {
     assert.throws(
       () => crypto.decrypt(invalid, validKey),
       /Decryption failed/
+    );
+  });
+});
+
+describe('crypto.js - Backward Compatibility', () => {
+  const validKey = crypto.generateKey();
+  const plaintext = 'Legacy format test';
+
+  it('should decrypt legacy format (without v1 metadata)', () => {
+    // Create a legacy format encrypted string by manually constructing it
+    const nodeCrypto = require('node:crypto');
+    const keyBuffer = Buffer.from(validKey, 'hex');
+    const iv = nodeCrypto.randomBytes(12);
+    const cipher = nodeCrypto.createCipheriv('aes-256-gcm', keyBuffer, iv);
+    let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag();
+
+    // Legacy format: IV:AUTH_TAG:ENCRYPTED_DATA (no v1| prefix)
+    const legacyFormat = `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+
+    // Should be able to decrypt legacy format
+    const decrypted = crypto.decrypt(legacyFormat, validKey);
+    assert.strictEqual(decrypted, plaintext);
+  });
+
+  it('should decrypt v1 format (with metadata)', () => {
+    // New v1 format with metadata
+    const encrypted = crypto.encrypt(plaintext, validKey);
+
+    // Verify it has v1 prefix
+    assert.ok(encrypted.startsWith('v1|'));
+
+    // Should be able to decrypt v1 format
+    const decrypted = crypto.decrypt(encrypted, validKey);
+    assert.strictEqual(decrypted, plaintext);
+  });
+
+  it('should maintain backward compatibility for old .env.lock files', () => {
+    // Simulate an old .env.lock file content
+    const oldContent = 'DATABASE_URL=postgresql://localhost/test\nAPI_KEY=old_key_123';
+
+    // Create legacy format encryption
+    const nodeCrypto = require('node:crypto');
+    const keyBuffer = Buffer.from(validKey, 'hex');
+    const iv = nodeCrypto.randomBytes(12);
+    const cipher = nodeCrypto.createCipheriv('aes-256-gcm', keyBuffer, iv);
+    let encrypted = cipher.update(oldContent, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag();
+    const legacyEncrypted = `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+
+    // Should decrypt successfully
+    const decrypted = crypto.decrypt(legacyEncrypted, validKey);
+    assert.strictEqual(decrypted, oldContent);
+  });
+
+  it('should reject corrupted v1 format (invalid checksum)', () => {
+    const encrypted = crypto.encrypt(plaintext, validKey);
+
+    // Tamper with checksum (second field in v1|timestamp|checksum|payload)
+    const parts = encrypted.split('|');
+    parts[2] = 'aaaa' + parts[2].substring(4); // Corrupt checksum
+    const corrupted = parts.join('|');
+
+    assert.throws(
+      () => crypto.decrypt(corrupted, validKey),
+      /Decryption failed: Invalid or corrupted data/
     );
   });
 });

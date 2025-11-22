@@ -389,9 +389,20 @@ SECRET=my_secret_value`);
     assert.ok(decryptOutput.includes('API_KEY=sk_test_abc123'));
     assert.ok(decryptOutput.includes('SECRET=my_secret_value'));
 
-    // Step 5: Verify encrypted file format
+    // Step 5: Verify encrypted file format (v1 format)
     const encrypted = fs.readFileSync(path.join(testDir, '.env.lock'), 'utf8');
-    const parts = encrypted.trim().split(':');
+    assert.ok(encrypted.startsWith('v1|'), 'Should use v1 format');
+
+    // Parse v1 format: v1|timestamp|checksum|IV:TAG:DATA
+    const metaParts = encrypted.trim().split('|');
+    assert.strictEqual(metaParts.length, 4);
+    assert.strictEqual(metaParts[0], 'v1'); // Version
+    assert.match(metaParts[1], /^\d+$/); // Timestamp
+    assert.match(metaParts[2], /^[0-9a-f]{64}$/); // SHA-256 checksum
+
+    // Verify payload format: IV:TAG:DATA
+    const payload = metaParts[3];
+    const parts = payload.split(':');
     assert.strictEqual(parts.length, 3);
     assert.match(parts[0], /^[0-9a-f]+$/); // IV
     assert.match(parts[1], /^[0-9a-f]+$/); // Auth tag
