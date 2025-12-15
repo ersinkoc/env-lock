@@ -151,9 +151,11 @@ function config(options = {}) {
     }
 
     if (!silent) {
-      console.log(
-        `[env-lock] Successfully loaded ${injectedCount} environment variable(s) from .env.lock`
-      );
+      let message = `[env-lock] Successfully loaded ${injectedCount} environment variable(s) from .env.lock`;
+      if (skippedCount > 0) {
+        message += ` (${skippedCount} skipped due to invalid keys)`;
+      }
+      console.log(message);
     }
 
     return parsed;
@@ -258,9 +260,11 @@ async function configAsync(options = {}) {
     }
 
     if (!silent) {
-      console.log(
-        `[env-lock] Successfully loaded ${injectedCount} environment variable(s) from .env.lock`
-      );
+      let message = `[env-lock] Successfully loaded ${injectedCount} environment variable(s) from .env.lock`;
+      if (skippedCount > 0) {
+        message += ` (${skippedCount} skipped due to invalid keys)`;
+      }
+      console.log(message);
     }
 
     return parsed;

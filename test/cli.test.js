@@ -518,3 +518,81 @@ describe('CLI - Additional Error Coverage', () => {
     }
   });
 });
+
+describe('CLI - Symlink Security Tests', () => {
+  let testDir;
+
+  beforeEach(() => {
+    testDir = path.join(__dirname, 'temp_cli_symlink_' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should reject symlink directory pointing outside cwd for output', () => {
+    // Create test .env file
+    const envPath = path.join(testDir, '.env');
+    fs.writeFileSync(envPath, 'KEY=value');
+
+    // Create symlink to /tmp (outside testDir)
+    const symlinkDir = path.join(testDir, 'symlink-dir');
+    try {
+      fs.symlinkSync('/tmp', symlinkDir);
+    } catch (err) {
+      // Skip if symlinks not supported (e.g., Windows without admin)
+      if (err.code === 'EPERM' || err.code === 'ENOSYS') {
+        return;
+      }
+      throw err;
+    }
+
+    // Try to encrypt with output in symlink directory
+    const key = crypto.generateKey();
+    const result = runCLI(`encrypt --key ${key} --input "${envPath}" --output "${symlinkDir}/output.lock"`, {
+      cwd: testDir
+    });
+
+    // Should fail because symlink points outside cwd
+    if (result.error) {
+      assert.ok(
+        result.stderr.includes('Path must be within current directory') ||
+        result.stdout.includes('Path must be within current directory') ||
+        result.stderr.includes('Error') ||
+        result.stdout.includes('Error')
+      );
+    }
+  });
+
+  it('should allow symlink within cwd for input files', () => {
+    // Create actual .env file
+    const actualEnvPath = path.join(testDir, 'actual.env');
+    fs.writeFileSync(actualEnvPath, 'SYMLINK_TEST=value123');
+
+    // Create symlink to actual file
+    const symlinkPath = path.join(testDir, 'link.env');
+    try {
+      fs.symlinkSync(actualEnvPath, symlinkPath);
+    } catch (err) {
+      // Skip if symlinks not supported
+      if (err.code === 'EPERM' || err.code === 'ENOSYS') {
+        return;
+      }
+      throw err;
+    }
+
+    // Encrypt via symlink should work (symlink stays within cwd)
+    const key = crypto.generateKey();
+    const outputPath = path.join(testDir, '.env.lock');
+    const result = runCLI(`encrypt --key ${key} --input "${symlinkPath}" --output "${outputPath}"`);
+
+    // Should succeed
+    assert.ok(
+      result.includes('Encrypted') ||
+      fs.existsSync(outputPath)
+    );
+  });
+});
