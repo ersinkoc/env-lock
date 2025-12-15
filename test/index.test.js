@@ -889,3 +889,176 @@ describe('index.js - Edge Cases and Advanced Scenarios', () => {
     assert.deepStrictEqual(result, {});
   });
 });
+
+describe('index.js - configAsync() Asynchronous API', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+    envLock = require('../src/index.js');
+    originalEnv = { ...process.env };
+    testDir = path.join(__dirname, `test-async-${Date.now()}`);
+    fs.mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should export configAsync function', () => {
+    assert.strictEqual(typeof envLock.configAsync, 'function');
+  });
+
+  it('should export loadAsync function', () => {
+    assert.strictEqual(typeof envLock.loadAsync, 'function');
+  });
+
+  it('should return empty object when OXOG_ENV_KEY is not set', async () => {
+    delete process.env.OXOG_ENV_KEY;
+    const result = await envLock.configAsync({ silent: true });
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('should return empty object when file does not exist', async () => {
+    process.env.OXOG_ENV_KEY = crypto.generateKey();
+    const result = await envLock.configAsync({
+      path: path.join(testDir, 'nonexistent.lock'),
+      silent: true
+    });
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('should successfully decrypt and load variables asynchronously', async () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const testData = 'ASYNC_VAR1=value1\nASYNC_VAR2=value2';
+    const encrypted = crypto.encrypt(testData, key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    const result = await envLock.configAsync({
+      path: filePath,
+      silent: true
+    });
+
+    assert.strictEqual(result.ASYNC_VAR1, 'value1');
+    assert.strictEqual(result.ASYNC_VAR2, 'value2');
+  });
+
+  it('should inject variables into process.env', async () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const testData = 'ASYNC_INJECT=injected_value';
+    const encrypted = crypto.encrypt(testData, key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    await envLock.configAsync({
+      path: filePath,
+      silent: true
+    });
+
+    assert.strictEqual(process.env.ASYNC_INJECT, 'injected_value');
+  });
+
+  it('should not override existing vars by default', async () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+    process.env.EXISTING_VAR = 'original';
+
+    const testData = 'EXISTING_VAR=from_file';
+    const encrypted = crypto.encrypt(testData, key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    await envLock.configAsync({
+      path: filePath,
+      silent: true
+    });
+
+    assert.strictEqual(process.env.EXISTING_VAR, 'original');
+  });
+
+  it('should override existing vars when override=true', async () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+    process.env.OVERRIDE_VAR = 'original';
+
+    const testData = 'OVERRIDE_VAR=from_file';
+    const encrypted = crypto.encrypt(testData, key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    await envLock.configAsync({
+      path: filePath,
+      override: true,
+      silent: true
+    });
+
+    assert.strictEqual(process.env.OVERRIDE_VAR, 'from_file');
+  });
+
+  it('should return empty object with wrong decryption key', async () => {
+    const correctKey = crypto.generateKey();
+    const wrongKey = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = wrongKey;
+
+    const testData = 'SECRET=value';
+    const encrypted = crypto.encrypt(testData, correctKey);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    const result = await envLock.configAsync({
+      path: filePath,
+      silent: true
+    });
+
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('should return empty object for empty file', async () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, '');
+
+    const result = await envLock.configAsync({
+      path: filePath,
+      silent: true
+    });
+
+    assert.deepStrictEqual(result, {});
+  });
+
+  it('loadAsync should work same as configAsync', async () => {
+    const key = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = key;
+
+    const testData = 'LOAD_ASYNC_VAR=loaded';
+    const encrypted = crypto.encrypt(testData, key);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    const result = await envLock.loadAsync({
+      path: filePath,
+      silent: true
+    });
+
+    assert.strictEqual(result.LOAD_ASYNC_VAR, 'loaded');
+    assert.strictEqual(process.env.LOAD_ASYNC_VAR, 'loaded');
+  });
+});

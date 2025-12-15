@@ -346,7 +346,7 @@ try {
   decrypt(encrypted, wrongKey);
 } catch (error) {
   console.error('Decryption failed:', error.message);
-  // Output: 'Decryption failed: Invalid key or tampered data detected'
+  // Output: 'Decryption failed: Invalid or corrupted data'
 }
 
 // Tampered data throws error
@@ -533,6 +533,39 @@ const specialContent = stringify(special);
 
 ---
 
+## Security API
+
+### clearRateLimit()
+
+⭐ **New in v1.1.0** - Clears the rate limit tracking for a specific key. Primarily for testing purposes.
+
+#### Syntax
+
+```javascript
+const { clearRateLimit } = require('@oxog/env-lock');
+clearRateLimit(keyHex);
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `keyHex` | string | The encryption key (hex) to clear rate limit for |
+
+#### Returns
+
+- **void**: No return value
+
+#### Use Cases
+
+- Clearing rate limits in test suites
+- Resetting rate limits after key rotation
+- Development/debugging purposes
+
+**Note:** This function should not be exposed to end users in production as it could be used to bypass security rate limiting.
+
+---
+
 ## Constants
 
 Cryptographic constants exported for reference.
@@ -542,14 +575,28 @@ const {
   ALGORITHM,
   KEY_LENGTH,
   IV_LENGTH,
-  AUTH_TAG_LENGTH
+  AUTH_TAG_LENGTH,
+  MAX_INPUT_SIZE,
+  RATE_LIMIT_WINDOW,
+  MAX_FAILED_ATTEMPTS
 } = require('@oxog/env-lock');
 
-console.log(ALGORITHM);       // 'aes-256-gcm'
-console.log(KEY_LENGTH);      // 32 (bytes)
-console.log(IV_LENGTH);       // 12 (bytes)
-console.log(AUTH_TAG_LENGTH); // 16 (bytes)
+console.log(ALGORITHM);           // 'aes-256-gcm'
+console.log(KEY_LENGTH);          // 32 (bytes)
+console.log(IV_LENGTH);           // 12 (bytes)
+console.log(AUTH_TAG_LENGTH);     // 16 (bytes)
+console.log(MAX_INPUT_SIZE);      // 10485760 (10MB)
+console.log(RATE_LIMIT_WINDOW);   // 60000 (1 minute in ms)
+console.log(MAX_FAILED_ATTEMPTS); // 10
 ```
+
+### Security Constants (v1.1.0)
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_INPUT_SIZE` | 10MB | Maximum input size for encryption/decryption (DoS prevention) |
+| `RATE_LIMIT_WINDOW` | 60000ms | Time window for rate limiting (1 minute) |
+| `MAX_FAILED_ATTEMPTS` | 10 | Maximum failed decryption attempts per window |
 
 ---
 
@@ -803,13 +850,26 @@ For browser environments, use alternative solutions or build-time encryption.
 
 ## Version History
 
-### v1.0.0 (Current)
+### v1.1.0 (Current)
+- **Security Hardening Release**
+- Added `configAsync()` and `loadAsync()` for non-blocking I/O
+- Added `clearRateLimit()` function for testing
+- Implemented rate limiting for decryption attempts (10 attempts per minute)
+- Added input size validation (10MB max) for DoS prevention
+- Improved memory security with buffer zeroing
+- Added path traversal protection with symlink resolution
+- Unified error messages to prevent information disclosure
+- Fixed O(n²) parser complexity for multiline values
+- Added file integrity verification with v1 format (timestamp + checksum)
+- Improved environment key validation with dangerous key blocklist
+- 187+ tests with ~92% coverage
+
+### v1.0.0
 - Initial release
 - AES-256-GCM encryption
 - Zero dependencies
 - CLI tool
 - Runtime API
-- 99.5%+ test coverage
 
 ---
 

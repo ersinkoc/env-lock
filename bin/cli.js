@@ -49,6 +49,18 @@ function validateFilePath(filePath, mustExist = false) {
       }
       throw err;
     }
+  } else {
+    // For output files that don't exist yet, resolve symlinks in parent directory
+    // to prevent symlink-based directory traversal attacks (HIGH-003 fix)
+    const parentDir = path.dirname(resolvedPath);
+    const fileName = path.basename(resolvedPath);
+    try {
+      const realParentDir = fs.realpathSync(parentDir);
+      resolvedPath = path.join(realParentDir, fileName);
+    } catch (err) {
+      // Parent directory doesn't exist - writeFileSync will fail with ENOENT later
+      // The resolved path stays as-is, which is safe since parent doesn't exist
+    }
   }
 
   // Get real path of current working directory to handle symlinks in cwd itself
