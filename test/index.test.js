@@ -890,6 +890,110 @@ describe('index.js - Edge Cases and Advanced Scenarios', () => {
   });
 });
 
+describe('index.js - BUG-002: Allow Legitimate Node.js Environment Variables', () => {
+  let envLock;
+  let originalEnv;
+  let testDir;
+  let testKey;
+
+  beforeEach(() => {
+    delete require.cache[require.resolve('../src/index.js')];
+    envLock = require('../src/index.js');
+    originalEnv = { ...process.env };
+    testDir = path.join(__dirname, `test-bug002-${Date.now()}`);
+    fs.mkdirSync(testDir, { recursive: true });
+    testKey = crypto.generateKey();
+    process.env.OXOG_ENV_KEY = testKey;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should allow NODE_DEBUG environment variable', () => {
+    const testData = 'NODE_DEBUG=http,net';
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    const result = envLock.config({
+      path: filePath,
+      silent: true
+    });
+
+    // NODE_DEBUG should be loaded successfully (was blocked before BUG-002 fix)
+    assert.strictEqual(result.NODE_DEBUG, 'http,net');
+    assert.strictEqual(process.env.NODE_DEBUG, 'http,net');
+  });
+
+  it('should allow NODE_PATH environment variable', () => {
+    const testData = 'NODE_PATH=/custom/node_modules';
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    const result = envLock.config({
+      path: filePath,
+      silent: true
+    });
+
+    // NODE_PATH should be loaded successfully (was blocked before BUG-002 fix)
+    assert.strictEqual(result.NODE_PATH, '/custom/node_modules');
+    assert.strictEqual(process.env.NODE_PATH, '/custom/node_modules');
+  });
+
+  it('should still block NODE_OPTIONS for security', () => {
+    const testData = 'NODE_OPTIONS=--require=/tmp/malicious.js';
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    // Clear any existing NODE_OPTIONS
+    delete process.env.NODE_OPTIONS;
+
+    const result = envLock.config({
+      path: filePath,
+      silent: true
+    });
+
+    // NODE_OPTIONS is parsed but NOT injected into process.env (blocked)
+    assert.strictEqual(result.NODE_OPTIONS, '--require=/tmp/malicious.js'); // Parsed value
+    assert.strictEqual(process.env.NODE_OPTIONS, undefined); // Not injected
+  });
+
+  it('should still block prototype pollution keys from process.env', () => {
+    const testData = '__proto__=polluted\nconstructor=bad\nprototype=evil\nSAFE_KEY=safe_value';
+    const encrypted = crypto.encrypt(testData, testKey);
+
+    const filePath = path.join(testDir, '.env.lock');
+    fs.writeFileSync(filePath, encrypted);
+
+    // Clear any potential existing values
+    delete process.env.SAFE_KEY;
+
+    const result = envLock.config({
+      path: filePath,
+      silent: true
+    });
+
+    // The critical security check: dangerous keys should NOT be own properties of process.env
+    // Use hasOwn to check if they were injected as actual properties
+    assert.strictEqual(Object.hasOwn(process.env, '__proto__'), false);
+    assert.strictEqual(Object.hasOwn(process.env, 'constructor'), false);
+    assert.strictEqual(Object.hasOwn(process.env, 'prototype'), false);
+
+    // But safe keys should be injected
+    assert.strictEqual(process.env.SAFE_KEY, 'safe_value');
+    assert.strictEqual(result.SAFE_KEY, 'safe_value');
+  });
+});
+
 describe('index.js - configAsync() Asynchronous API', () => {
   let envLock;
   let originalEnv;

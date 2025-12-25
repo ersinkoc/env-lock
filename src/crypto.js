@@ -13,15 +13,30 @@ const crypto = require('node:crypto');
 /**
  * Forces V8 to retain buffer in memory after zeroing
  * Prevents dead store elimination optimization
+ * BUG-004 fix: Improved to access multiple points in buffer
  * @param {Buffer} buffer - Buffer to verify
  */
 function volatileRead(buffer) {
   // Volatile read to prevent optimization
   // This forces V8 to keep the buffer and not optimize away the fill(0)
   if (buffer && buffer.length > 0) {
-    // Use timing-safe comparison to force buffer retention
-    const zero = Buffer.alloc(1, 0);
-    crypto.timingSafeEqual(buffer.subarray(0, 1), zero);
+    // Access multiple points in the buffer to ensure entire buffer is retained
+    // Use XOR to combine values without branching (prevents optimization)
+    let volatileAccumulator = 0;
+
+    // Sample at start, middle, and end
+    volatileAccumulator ^= buffer[0];
+    if (buffer.length > 1) {
+      volatileAccumulator ^= buffer[Math.floor(buffer.length / 2)];
+      volatileAccumulator ^= buffer[buffer.length - 1];
+    }
+
+    // Use the accumulator in a way that appears meaningful to the optimizer
+    // but actually does nothing (XOR with itself always equals 0)
+    if (volatileAccumulator !== (volatileAccumulator ^ volatileAccumulator)) {
+      // This branch never executes, but prevents dead code elimination
+      throw new Error('Volatile read validation failed');
+    }
   }
 }
 
@@ -36,6 +51,10 @@ const MAX_INPUT_SIZE = 10 * 1024 * 1024; // 10MB max input size for DoS preventi
 const RATE_LIMIT_WINDOW = 60000; // 1 minute window
 const MAX_FAILED_ATTEMPTS = 10; // Max failed attempts per window
 const failedAttempts = new Map(); // Track failed attempts by key hash
+
+// Cleanup interval for failed attempts (prevents memory leak)
+const CLEANUP_INTERVAL = 300000; // 5 minutes
+let lastCleanup = Date.now();
 
 /**
  * Validates that a value is a valid non-empty string
@@ -62,15 +81,37 @@ function clearRateLimit(keyHash) {
 }
 
 /**
+ * Cleans up old entries from failedAttempts Map to prevent memory leak
+ * Removes entries older than RATE_LIMIT_WINDOW
+ */
+function cleanupFailedAttempts() {
+  const now = Date.now();
+  const cutoff = now - RATE_LIMIT_WINDOW;
+
+  // Iterate and remove old entries
+  for (const [keyHash, attempts] of failedAttempts.entries()) {
+    if (attempts.firstAttempt < cutoff) {
+      failedAttempts.delete(keyHash);
+    }
+  }
+
+  lastCleanup = now;
+}
+
+/**
  * Checks if decryption should be rate limited
  * @param {string} keyHex - The encryption key
  * @returns {boolean} True if rate limited
  */
 function isRateLimited(keyHex) {
+  // Periodic cleanup to prevent memory leak (BUG-001 fix)
+  const now = Date.now();
+  if (now - lastCleanup > CLEANUP_INTERVAL) {
+    cleanupFailedAttempts();
+  }
+
   // Hash the key to track attempts without storing actual key
   const keyHash = crypto.createHash('sha256').update(keyHex).digest('hex');
-
-  const now = Date.now();
   const attempts = failedAttempts.get(keyHash) || { count: 0, firstAttempt: now };
 
   // Reset if outside window
