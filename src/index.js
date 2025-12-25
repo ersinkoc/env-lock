@@ -14,18 +14,14 @@ const { decrypt } = require('./crypto');
 const { parse } = require('./parser');
 
 // Dangerous environment variable keys that should never be set from .env files
+// BUG-002 fix: Removed NODE_DEBUG, NODE_PATH (legitimate Node.js vars)
+// and JavaScript keywords (eval, require, module, exports) which are harmless as env var names
 const DANGEROUS_KEYS = new Set([
-  '__proto__',
-  'constructor',
-  'prototype',
-  'NODE_OPTIONS',
-  'NODE_PATH',
-  'NODE_DEBUG',
-  'NODE_REPL_HISTORY',
-  'eval',
-  'require',
-  'module',
-  'exports'
+  '__proto__',          // Prototype pollution
+  'constructor',        // Prototype pollution
+  'prototype',          // Prototype pollution
+  'NODE_OPTIONS',       // Can inject --require for arbitrary code execution
+  'NODE_REPL_HISTORY'   // Can redirect REPL history to attacker-controlled file
 ]);
 
 // Maximum allowed length for environment variable keys (prevent DoS)
@@ -61,6 +57,68 @@ function isValidEnvKey(key) {
  * @property {boolean} [override] - Whether to override existing env variables (default: false)
  * @property {boolean} [silent] - Suppress warnings and errors (default: false)
  */
+
+/**
+ * Core logic for processing decrypted .env content
+ * BUG-003 fix: Extract common logic to eliminate duplication between config() and configAsync()
+ * @param {string} encryptedContent - The encrypted content to decrypt
+ * @param {string} encryptionKey - The encryption key
+ * @param {boolean} override - Whether to override existing variables
+ * @param {boolean} silent - Whether to suppress output
+ * @returns {Object} Parsed environment variables
+ */
+function processEnvLock(encryptedContent, encryptionKey, override, silent) {
+  // Decrypt content
+  let decryptedContent;
+  try {
+    decryptedContent = decrypt(encryptedContent, encryptionKey);
+  } catch (error) {
+    if (!silent) {
+      console.error(
+        '[env-lock] Error: Failed to decrypt .env.lock. ' +
+        'Please verify that OXOG_ENV_KEY is correct.'
+      );
+      // Do not expose error details to prevent information disclosure
+    }
+    return {};
+  }
+
+  // Parse decrypted content
+  const parsed = parse(decryptedContent);
+
+  // Inject variables into process.env
+  let injectedCount = 0;
+  let skippedCount = 0;
+  for (const [key, value] of Object.entries(parsed)) {
+    // Validate key name for security
+    if (!isValidEnvKey(key)) {
+      if (!silent) {
+        // Do not expose key name to prevent information disclosure
+        console.warn('[env-lock] Warning: Skipping invalid or dangerous environment variable key');
+      }
+      skippedCount++;
+      continue;
+    }
+
+    // Skip if key already exists and override is false
+    if (!override && Object.prototype.hasOwnProperty.call(process.env, key)) {
+      continue;
+    }
+
+    process.env[key] = value;
+    injectedCount++;
+  }
+
+  if (!silent) {
+    let message = `[env-lock] Successfully loaded ${injectedCount} environment variable(s) from .env.lock`;
+    if (skippedCount > 0) {
+      message += ` (${skippedCount} skipped due to invalid keys)`;
+    }
+    console.log(message);
+  }
+
+  return parsed;
+}
 
 /**
  * Loads and decrypts .env.lock file, injecting variables into process.env
@@ -109,56 +167,8 @@ function config(options = {}) {
       return {};
     }
 
-    // Decrypt content
-    let decryptedContent;
-    try {
-      decryptedContent = decrypt(encryptedContent, encryptionKey);
-    } catch (error) {
-      if (!silent) {
-        console.error(
-          '[env-lock] Error: Failed to decrypt .env.lock. ' +
-          'Please verify that OXOG_ENV_KEY is correct.'
-        );
-        // Do not expose error details to prevent information disclosure
-      }
-      return {};
-    }
-
-    // Parse decrypted content
-    const parsed = parse(decryptedContent);
-
-    // Inject variables into process.env
-    let injectedCount = 0;
-    let skippedCount = 0;
-    for (const [key, value] of Object.entries(parsed)) {
-      // Validate key name for security
-      if (!isValidEnvKey(key)) {
-        if (!silent) {
-          // Do not expose key name to prevent information disclosure
-          console.warn('[env-lock] Warning: Skipping invalid or dangerous environment variable key');
-        }
-        skippedCount++;
-        continue;
-      }
-
-      // Skip if key already exists and override is false
-      if (!override && Object.prototype.hasOwnProperty.call(process.env, key)) {
-        continue;
-      }
-
-      process.env[key] = value;
-      injectedCount++;
-    }
-
-    if (!silent) {
-      let message = `[env-lock] Successfully loaded ${injectedCount} environment variable(s) from .env.lock`;
-      if (skippedCount > 0) {
-        message += ` (${skippedCount} skipped due to invalid keys)`;
-      }
-      console.log(message);
-    }
-
-    return parsed;
+    // BUG-003 fix: Use shared processing logic
+    return processEnvLock(encryptedContent, encryptionKey, override, silent);
   } catch (error) {
     // Handle file not found error specifically
     if (error.code === 'ENOENT') {
@@ -218,56 +228,8 @@ async function configAsync(options = {}) {
       return {};
     }
 
-    // Decrypt content
-    let decryptedContent;
-    try {
-      decryptedContent = decrypt(encryptedContent, encryptionKey);
-    } catch (error) {
-      if (!silent) {
-        console.error(
-          '[env-lock] Error: Failed to decrypt .env.lock. ' +
-          'Please verify that OXOG_ENV_KEY is correct.'
-        );
-        // Do not expose error details to prevent information disclosure
-      }
-      return {};
-    }
-
-    // Parse decrypted content
-    const parsed = parse(decryptedContent);
-
-    // Inject variables into process.env
-    let injectedCount = 0;
-    let skippedCount = 0;
-    for (const [key, value] of Object.entries(parsed)) {
-      // Validate key name for security
-      if (!isValidEnvKey(key)) {
-        if (!silent) {
-          // Do not expose key name to prevent information disclosure
-          console.warn('[env-lock] Warning: Skipping invalid or dangerous environment variable key');
-        }
-        skippedCount++;
-        continue;
-      }
-
-      // Skip if key already exists and override is false
-      if (!override && Object.prototype.hasOwnProperty.call(process.env, key)) {
-        continue;
-      }
-
-      process.env[key] = value;
-      injectedCount++;
-    }
-
-    if (!silent) {
-      let message = `[env-lock] Successfully loaded ${injectedCount} environment variable(s) from .env.lock`;
-      if (skippedCount > 0) {
-        message += ` (${skippedCount} skipped due to invalid keys)`;
-      }
-      console.log(message);
-    }
-
-    return parsed;
+    // BUG-003 fix: Use shared processing logic
+    return processEnvLock(encryptedContent, encryptionKey, override, silent);
   } catch (error) {
     // Handle file not found error specifically
     if (error.code === 'ENOENT') {
